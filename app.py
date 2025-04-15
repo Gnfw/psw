@@ -24,7 +24,8 @@ from typing import List, Tuple, Optional, Union
 # Библиотеки для криптографии
 try:
    try:
-    from Cryptodome.Random import get_random_bytes  # Обратите внимание на "Cryptodome" вместо "Crypto"
+    import pycryptodome
+    from Crypto.Random import get_random_bytes
 except ImportError:
     print("Ошибка: Не удалось импортировать pycryptodome. Установите его с помощью pip install pycryptodome")
     sys.exit(1)
