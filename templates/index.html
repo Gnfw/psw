@@ -1,1 +1,116 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Password Manager</title>
+    <style>
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .section { margin-bottom: 30px; border: 1px solid #ddd; padding: 20px; }
+        .options-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .result { margin-top: 20px; padding: 15px; background: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Генератор и Проверка Паролей</h1>
+        
+        <!-- Генерация пароля -->
+        <div class="section">
+            <h2>Сгенерировать пароль</h2>
+            <div class="options-grid">
+                <div>
+                    <label>Длина пароля: <input type="number" id="length" value="16" min="8"></label>
+                </div>
+                <div>
+                    <label>Разделитель: <input type="text" id="separator" value="-" maxlength="1"></label>
+                </div>
+                <div>
+                    <label>Группировка: <input type="number" id="group_size" value="4" min="1"></label>
+                </div>
+            </div>
+            
+            <h3>Опции:</h3>
+            <div class="options-grid" id="options"></div>
+            
+            <button onclick="generatePassword()">Сгенерировать</button>
+            <div class="result" id="generation-result"></div>
+        </div>
 
+        <!-- Проверка пароля -->
+        <div class="section">
+            <h2>Проверить пароль</h2>
+            <input type="password" id="password-to-check" placeholder="Введите пароль">
+            <button onclick="checkPassword()">Проверить</button>
+            <div class="result" id="check-result"></div>
+        </div>
+    </div>
+
+    <script>
+        // Динамическая загрузка опций
+        const options = [
+            'OPT_LOWERCASE', 'OPT_UPPERCASE', 'OPT_DIGITS', 'OPT_SPECIAL',
+            'OPT_NO_DIGITS', 'OPT_SEPARATORS', 'OPT_FULLASCII', 'OPT_AVOID_SIMILAR',
+            'OPT_NO_REPEAT', 'OPT_RANDOM_CASE', 'OPT_CUSTOM_CHARSET', 'OPT_LANGUAGE_SPECIFIC'
+        ];
+
+        const optionsContainer = document.getElementById('options');
+        options.forEach(opt => {
+            optionsContainer.innerHTML += `
+                <label>
+                    <input type="checkbox" value="${opt}">
+                    ${opt.replace('OPT_', '').replace('_', ' ')}
+                </label>
+            `;
+        });
+
+        async function generatePassword() {
+            const options = Array.from(document.querySelectorAll('#options input:checked'))
+                .map(el => el.value);
+            
+            const params = {
+                length: parseInt(document.getElementById('length').value),
+                options: options,
+                separator: document.getElementById('separator').value,
+                group_size: parseInt(document.getElementById('group_size').value)
+            };
+
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+                
+                const result = await response.json();
+                document.getElementById('generation-result').innerHTML = 
+                    `Пароль: <strong>${result.password}</strong><br>
+                     Длина: ${result.password.length} символов`;
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        async function checkPassword() {
+            const password = document.getElementById('password-to-check').value;
+            
+            try {
+                const response = await fetch('/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                
+                const result = await response.json();
+                document.getElementById('check-result').innerHTML = `
+                    Надежность: ${result.strength}<br>
+                    Энтропия: ${result.entropy}<br>
+                    Время подбора: ${Math.round(result.time_to_crack)} сек<br>
+                    Скомпрометирован: ${result.compromised ? 'Да ⚠️' : 'Нет ✅'}
+                `;
+            } catch (error) {
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
