@@ -1,21 +1,5 @@
-# app.py
 from flask import Flask, render_template, request, jsonify
-import sys
 import math
-import json
-import secrets
-import string
-import requests
-from enum import IntFlag
-
-app = Flask(__name__)
-
-# ... (Весь ваш исходный код функций и классов до функции main()) ... 
-
-import os
-import sys
-import math
-import json
 import secrets
 import string
 import requests
@@ -23,52 +7,9 @@ import hashlib
 from enum import IntFlag
 from typing import Tuple
 
-def get_cryptographically_random_bytes(num_bytes: int) -> bytes:
-    """Генерация криптобезопасных случайных байтов"""
-    return secrets.token_bytes(num_bytes)
+app = Flask(__name__)
 
-def bytes_to_uniform_chars(random_bytes: bytes, charset: str) -> str:
-    """Преобразование байтов в символы с равномерным распределением"""
-    if not charset:
-        raise ValueError("CharSet is empty")
-    if not random_bytes:
-        return ""
-
-    char_set_size = len(charset)
-    result = []
-    
-    # Преобразование с использованием модульной арифметики
-    for i in range(0, len(random_bytes), 4):
-        chunk = random_bytes[i:i+4]
-        value = int.from_bytes(chunk, byteorder='big', signed=False)
-        
-        while value > 0:
-            result.append(charset[value % char_set_size])
-            value = value // char_set_size
-            if len(result) >= (len(random_bytes) * 8 // math.ceil(math.log2(char_set_size))):
-                break
-
-    return ''.join(result)
-
-def generate_strong_password(length: int, charset: str) -> str:
-    """Генерация криптобезопасного пароля"""
-    if length <= 0:
-        raise ValueError("Password length must be positive")
-    if not charset:
-        raise ValueError("Empty charset")
-
-    # Увеличенный размер буфера для лучшего распределения
-    required_bytes = math.ceil(length * 2)
-    random_bytes = get_cryptographically_random_bytes(required_bytes)
-    password = bytes_to_uniform_chars(random_bytes, charset)
-    
-    return password[:length]  # Обрезаем до нужной длины
-
-# Остальные функции остаются без изменений, кроме удаления зависимостей от Crypto
-# (add_separators, check_password_strength, get_password_strength_info, 
-# PasswordOptions, is_password_pwned, generate_password_with_options, 
-# check_user_password, main)
-
+# Класс опций пароля
 class PasswordOptions(IntFlag):
     OPT_LOWERCASE = 1 << 0
     OPT_UPPERCASE = 1 << 1
@@ -84,113 +25,178 @@ class PasswordOptions(IntFlag):
     OPT_LANGUAGE_SPECIFIC = 1 << 11
     OPT_OUTPUT_FORMAT = 1 << 12
 
+# Основные функции
+def get_cryptographically_random_bytes(num_bytes: int) -> bytes:
+    return secrets.token_bytes(num_bytes)
+
+def bytes_to_uniform_chars(random_bytes: bytes, charset: str) -> str:
+    if not charset:
+        raise ValueError("CharSet is empty")
+    
+    char_set_size = len(charset)
+    result = []
+    
+    for i in range(0, len(random_bytes), 4):
+        chunk = random_bytes[i:i+4]
+        value = int.from_bytes(chunk, byteorder='big')
+        
+        while value > 0:
+            result.append(charset[value % char_set_size])
+            value = value // char_set_size
+    
+    return ''.join(result)
+
+def generate_strong_password(length: int, charset: str) -> str:
+    required_bytes = math.ceil(length * 2)
+    random_bytes = get_cryptographically_random_bytes(required_bytes)
+    password = bytes_to_uniform_chars(random_bytes, charset)
+    return password[:length]
+
+def add_separators(password: str, separator: str, group_size: int) -> str:
+    if group_size <= 0:
+        return password
+    
+    result = []
+    for i, char in enumerate(password):
+        if i > 0 and i % group_size == 0:
+            result.append(separator)
+        result.append(char)
+    return ''.join(result)
+
+def check_password_strength(password: str) -> Tuple[int, float, float]:
+    if len(password) < 8:
+        return 1, 0.0, 0.0
+    
+    has_lower = any(c.islower() for c in password)
+    has_upper = any(c.isupper() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    special_chars = "!@#$%^&*()_+~`|}{[]\\:;\"'<>?,./-="
+    has_special = any(c in special_chars for c in password)
+    
+    char_set_size = 0
+    if has_lower: char_set_size += 26
+    if has_upper: char_set_size += 26
+    if has_digit: char_set_size += 10
+    if has_special: char_set_size += len(special_chars)
+    
+    if char_set_size == 0: char_set_size = 1
+    
+    entropy = len(password) * math.log2(char_set_size)
+    time_to_crack = (2 ** entropy) / 1e10  # 10 млрд попыток/сек
+    
+    score = sum([has_lower, has_upper, has_digit, has_special])
+    score += min(3, len(password) // 8)
+    
+    for i in range(len(password)-2):
+        if password[i] == password[i+1] == password[i+2]:
+            return 1, entropy, time_to_crack
+    
+    strength = 1
+    if score >= 8: strength = 5
+    elif score >= 7: strength = 4
+    elif score >= 5: strength = 3
+    elif score >= 3: strength = 2
+    
+    return strength, entropy, time_to_crack
+
 def is_password_pwned(password: str) -> bool:
-    """Проверка пароля через Have I Been Pwned API"""
     try:
-        sha1_password = hashlib.sha1(password.encode('utf-8')).hexdigest().upper()
-        prefix, suffix = sha1_password[:5], sha1_password[5:]
-        
-        url = f"https://api.pwnedpasswords.com/range/{prefix}"
-        response = requests.get(url)
-        
-        if response.status_code == 200:
-            for line in response.text.splitlines():
-                if line.split(':')[0] == suffix:
-                    return True
-        return False
-    except Exception as e:
-        print(f"Ошибка при проверке пароля: {e}")
+        sha1 = hashlib.sha1(password.encode()).hexdigest().upper()
+        prefix, suffix = sha1[:5], sha1[5:]
+        response = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}")
+        return any(line.startswith(suffix) for line in response.text.splitlines())
+    except Exception:
         return False
 
-def initialize_crypto_libraries():
-    """Инициализация криптобиблиотек (пустая, так как используем стандартные)"""
-    pass
-
-# Остальные функции (add_separators, check_password_strength и т.д.) 
-# остаются без изменений из вашего исходного кода
-
-def main():
-    initialize_crypto_libraries()
+def generate_password_with_options(
+    length: int,
+    options: PasswordOptions,
+    separator: str = "-",
+    group_size: int = 4,
+    custom_charset: str = "",
+    language_charset: str = ""
+) -> str:
+    charset = ""
     
-    password_length = 24
-    separator = "-"
-    group_size = 4
-    
-    try:
-        # Пример использования
-        print("Пример генерации пароля:")
-        options = PasswordOptions.OPT_LOWERCASE | PasswordOptions.OPT_UPPERCASE | PasswordOptions.OPT_DIGITS
-        password = generate_password_with_options(password_length, options)
-        print(f"Сгенерированный пароль: {password}")
+    if options & PasswordOptions.OPT_CUSTOM_CHARSET:
+        charset = custom_charset
+    elif options & PasswordOptions.OPT_LANGUAGE_SPECIFIC:
+        charset = language_charset
+    elif options & PasswordOptions.OPT_FULLASCII:
+        charset = string.printable[:94]
+    else:
+        if options & PasswordOptions.OPT_LOWERCASE:
+            charset += string.ascii_lowercase
+        if options & PasswordOptions.OPT_UPPERCASE:
+            charset += string.ascii_uppercase
+        if options & PasswordOptions.OPT_DIGITS:
+            charset += string.digits
+        if options & PasswordOptions.OPT_SPECIAL:
+            charset += "!@#$%^&*()_+~`|}{[]\\:;\"'<>?,./-="
         
-        # Проверка пароля
-        check_user_password(password)
+        if options & PasswordOptions.OPT_NO_DIGITS:
+            charset = ''.join(c for c in charset if not c.isdigit())
         
-    except Exception as ex:
-        print(f"Ошибка генерации пароля: {ex}")
-        return 1
+        if options & PasswordOptions.OPT_AVOID_SIMILAR:
+            charset = ''.join(c for c in charset if c not in 'lI10Oo')
     
-    return 0
+    if not charset:
+        raise ValueError("Не удалось создать набор символов")
+    
+    password = generate_strong_password(length, charset)
+    
+    if options & PasswordOptions.OPT_RANDOM_CASE:
+        password = ''.join(secrets.choice([c.upper(), c.lower()]) for c in password)
+    
+    if options & PasswordOptions.OPT_SEPARATORS:
+        password = add_separators(password, separator, group_size)
+    
+    if options & PasswordOptions.OPT_NO_REPEAT:
+        password = ''.join(dict.fromkeys(password))
+    
+    return password[:length]
 
-if __name__ == "__main__":
-    sys.exit(main())
-
-
-
-
-
-
-
-
-
+# Маршруты Flask
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/generate', methods=['POST'])
-def generate_password_api():
+def generate_password():
     try:
         data = request.get_json()
+        
+        # Валидация данных
+        if not data or 'length' not in data:
+            return jsonify({"error": "Не указана длина пароля"}), 400
+        
+        length = int(data['length'])
+        if length < 8 or length > 100:
+            return jsonify({"error": "Некорректная длина пароля (8-100)"}), 400
+        
+        # Парсинг опций
         options = 0
         for opt in data.get('options', []):
-            options |= getattr(PasswordOptions, opt)
+            if hasattr(PasswordOptions, opt):
+                options |= getattr(PasswordOptions, opt)
         
+        # Генерация пароля
         password = generate_password_with_options(
-            length=data['length'],
+            length=length,
             options=PasswordOptions(options),
             separator=data.get('separator', '-'),
             group_size=data.get('group_size', 4),
             custom_charset=data.get('custom_charset', ''),
-            language_charset=data.get('language_charset', ''),
-            output_format='json' if data.get('json_format') else 'plain'
+            language_charset=data.get('language_charset', '')
         )
         
-        if data.get('json_format'):
-            return jsonify(json.loads(password))
-        return jsonify({"password": password})
-    
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-@app.route('/check', methods=['POST'])
-def check_password_api():
-    try:
-        data = request.get_json()
-        password = data['password']
-        
-        strength_info = json.loads(get_password_strength_info(password))
-        pwned = is_password_pwned(password)
-        
         return jsonify({
-            "strength": strength_info['strength'],
-            "entropy": strength_info['entropy'],
-            "time_to_crack": strength_info['timeToCrack'],
-            "compromised": pwned
+            "password": password,
+            "strength": check_password_strength(password)[0]
         })
     
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
-    initialize_crypto_libraries()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
