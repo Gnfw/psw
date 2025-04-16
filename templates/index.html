@@ -12,25 +12,53 @@
         button:hover { background: #0056b3; }
         .result { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px; }
         .error { color: #dc3545; }
-        input[type="number"], input[type="password"] { 
+        input[type="number"], input[type="password"], input[type="text"] { 
             padding: 8px; 
             margin: 5px 0; 
             border: 1px solid #ddd; 
             border-radius: 4px; 
             width: 200px; 
         }
-        .status-item { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .password-field { position: relative; display: inline-block; }
+        .toggle-password { 
+            position: absolute; 
+            right: 10px; 
+            top: 50%; 
+            transform: translateY(-50%);
+            cursor: pointer;
+            user-select: none;
+        }
+        .copy-btn {
+            margin-left: 10px;
+            padding: 5px 10px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .copy-btn:hover { background: #218838; }
+        .custom-charset-container { margin: 15px 0; }
+        .warning-list { margin: 5px 0; padding-left: 20px; }
+        .status-item { margin: 10px 0; padding: 15px; border-radius: 4px; }
         .weak { background: #ffcccc; }
         .medium { background: #fff3cd; }
         .strong { background: #d4edda; }
         .warnings { margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 4px; }
-        .warning-list { margin: 5px 0; padding-left: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="section">
             <h1>🔒 Генератор Паролей</h1>
+            
+            <div class="custom-charset-container">
+                <input type="text" id="customCharset" 
+                       placeholder="Введите свои символы (например: 🤖⚡🎉❤️)"
+                       class="custom-charset">
+                <button onclick="toggleCustomCharset()">Использовать эти символы</button>
+            </div>
+
             <div>
                 <label>Длина пароля: 
                     <input type="number" id="length" value="16" min="8" max="100">
@@ -53,17 +81,52 @@
 
         <div class="section">
             <h1>🔍 Проверка Пароля</h1>
-            <input type="password" id="passwordToCheck" placeholder="Введите пароль для проверки">
+            <div class="password-field">
+                <input type="password" id="passwordToCheck" 
+                       placeholder="Введите пароль для проверки">
+                <span class="toggle-password" onclick="togglePasswordVisibility()">👁️</span>
+            </div>
             <button onclick="checkPassword()">Проверить безопасность</button>
             <div class="result" id="checkResult"></div>
         </div>
     </div>
 
     <script>
+        let useCustomCharset = false;
+        
+        function toggleCustomCharset() {
+            useCustomCharset = !useCustomCharset;
+            const options = document.querySelectorAll('input[name="option"]');
+            const customInput = document.getElementById('customCharset');
+            
+            options.forEach(opt => {
+                opt.checked = false;
+                opt.disabled = useCustomCharset;
+            });
+            
+            customInput.disabled = !useCustomCharset;
+            alert(useCustomCharset ? 
+                "Режим пользовательских символов активирован" : 
+                "Стандартные настройки восстановлены");
+        }
+
+        function formatTime(seconds) {
+            if(seconds < 3600) return "<1 часа";
+            if(seconds < 86400) return `${Math.round(seconds/3600)} часов`;
+            const days = Math.round(seconds/86400);
+            return days > 365 ? 
+                `${Math.round(days/365)} лет` : 
+                `${days} дней`;
+        }
+
         async function generatePassword() {
             const options = Array.from(document.querySelectorAll('input[name="option"]:checked'))
                 .map(el => el.value);
             
+            if(useCustomCharset) {
+                options.push('OPT_CUSTOM_CHARSET');
+            }
+
             try {
                 const response = await fetch('/generate', {
                     method: 'POST',
@@ -71,11 +134,13 @@
                     body: JSON.stringify({
                         length: parseInt(document.getElementById('length').value),
                         options: options,
-                        separator: '-'
+                        separator: '-',
+                        custom_charset: document.getElementById('customCharset').value
                     })
                 });
                 
                 const data = await response.json();
+                const resultDiv = document.getElementById('generationResult');
                 
                 if (response.ok) {
                     const strengthMap = {
@@ -87,20 +152,36 @@
                     };
                     const [strengthText, strengthClass] = strengthMap[data.strength] || ['Неизвестно', ''];
                     
-                    document.getElementById('generationResult').innerHTML = `
+                    resultDiv.innerHTML = `
                         <div class="status-item ${strengthClass}">
-                            <strong>Сгенерированный пароль:</strong> ${data.password}<br>
-                            <strong>Уровень безопасности:</strong> ${strengthText}
+                            <strong>Пароль:</strong> <span id="generatedPassword">${data.password}</span>
+                            <button class="copy-btn" onclick="copyPassword()">Копировать</button>
+                            <div>Уровень безопасности: ${strengthText}</div>
                         </div>
                     `;
                 } else {
-                    document.getElementById('generationResult').innerHTML = 
-                        `<div class="status-item error">Ошибка: ${data.error}</div>`;
+                    resultDiv.innerHTML = `<div class="status-item error">Ошибка: ${data.error}</div>`;
                 }
             } catch (error) {
                 document.getElementById('generationResult').innerHTML = 
                     `<div class="status-item error">Ошибка соединения</div>`;
             }
+        }
+
+        function copyPassword() {
+            const passwordElement = document.getElementById('generatedPassword');
+            if(passwordElement) {
+                navigator.clipboard.writeText(passwordElement.innerText)
+                    .then(() => alert("Пароль скопирован!"))
+                    .catch(() => alert("Не удалось скопировать"));
+            }
+        }
+
+        function togglePasswordVisibility() {
+            const input = document.getElementById('passwordToCheck');
+            const toggleBtn = document.querySelector('.toggle-password');
+            input.type = input.type === 'password' ? 'text' : 'password';
+            toggleBtn.textContent = input.type === 'password' ? '👁️' : '👁️🗨️';
         }
 
         async function checkPassword() {
@@ -118,17 +199,12 @@
                 });
                 
                 const data = await response.json();
+                const resultDiv = document.getElementById('checkResult');
                 
                 if (response.ok) {
                     let strengthClass = 'weak';
                     if (data.strength === 'Средний') strengthClass = 'medium';
                     if (data.strength.includes('Надежный')) strengthClass = 'strong';
-
-                    const years = Math.floor(data.time_to_crack / (60*60*24*365));
-                    const days = Math.floor(data.time_to_crack / (60*60*24));
-                    const timeEstimate = years > 0 ? 
-                        `${years} лет` : 
-                        days > 0 ? `${days} дней` : "менее дня";
 
                     let warningsHTML = '';
                     if (data.warnings && data.warnings.length > 0) {
@@ -142,11 +218,11 @@
                         `;
                     }
 
-                    document.getElementById('checkResult').innerHTML = `
+                    resultDiv.innerHTML = `
                         <div class="status-item ${strengthClass}">
                             <div>🔐 Уровень безопасности: <strong>${data.strength}</strong></div>
                             <div>📊 Энтропия: ${data.entropy} бит</div>
-                            <div>⏱ Примерное время взлома: ~${timeEstimate}</div>
+                            <div>⏱ Примерное время взлома: ~${formatTime(data.time_to_crack)}</div>
                             <div>${data.compromised ? 
                                 '⚠️ ВНИМАНИЕ! Пароль найден в утечках данных!' : 
                                 '✅ Пароль не обнаружен в известных утечках'}</div>
@@ -155,12 +231,10 @@
                         </div>
                     `;
                 } else {
-                    document.getElementById('checkResult').innerHTML = 
-                        `<div class="status-item error">Ошибка: ${data.error}</div>`;
+                    resultDiv.innerHTML = `<div class="status-item error">Ошибка: ${data.error}</div>`;
                 }
             } catch (error) {
-                document.getElementById('checkResult').innerHTML = 
-                    `<div class="status-item error">Ошибка соединения</div>`;
+                resultDiv.innerHTML = `<div class="status-item error">Ошибка соединения</div>`;
             }
         }
     </script>
