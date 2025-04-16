@@ -108,14 +108,12 @@ def check_password_strength(password: str) -> Tuple[int, float, float, List[str]
     if len(password) < 8:
         return 1, 0.0, 0.0, ["Пароль слишком короткий (минимум 8 символов)"]
     
-    # Анализ состава символов
     has_lower = any(c.islower() for c in password)
     has_upper = any(c.isupper() for c in password)
     has_digit = any(c.isdigit() for c in password)
     special_chars = "!@#$%^&*()_+~`|}{[]\\:;\"'<>?,./-="
     has_special = any(c in special_chars for c in password)
     
-    # Расчет размера набора символов
     char_set_size = 0
     if has_lower: char_set_size += 26
     if has_upper: char_set_size += 26
@@ -123,15 +121,12 @@ def check_password_strength(password: str) -> Tuple[int, float, float, List[str]
     if has_special: char_set_size += len(special_chars)
     if char_set_size == 0: char_set_size = 1
     
-    # Расчет энтропии
     entropy = len(password) * math.log2(char_set_size)
-    time_to_crack = (2 ** entropy) / 1e10  # 10 млрд попыток/сек
+    time_to_crack = (2 ** entropy) / 1e10
     
-    # Базовый счетчик
     score = sum([has_lower, has_upper, has_digit, has_special])
     score += min(3, len(password) // 8)
     
-    # Дополнительные проверки
     penalty = 0
     if has_sequential_chars(password):
         penalty += 1
@@ -153,16 +148,13 @@ def check_password_strength(password: str) -> Tuple[int, float, float, List[str]
         penalty += 1
         warnings.append("Неравномерное распределение символов")
     
-    # Проверка повторов
     for i in range(len(password)-2):
         if password[i] == password[i+1] == password[i+2]:
             return 1, 0.0, 0.0, ["Обнаружены три повторяющихся символа подряд"]
     
-    # Корректировка счета
     score -= penalty
     if score < 1: score = 1
     
-    # Определение уровня надежности
     strength = 1
     if score >= 8: strength = 5
     elif score >= 7: strength = 4
@@ -175,7 +167,7 @@ def is_password_pwned(password: str) -> bool:
     try:
         sha1 = hashlib.sha1(password.encode()).hexdigest().upper()
         prefix, suffix = sha1[:5], sha1[5:]
-        response = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}", timeout=3)
+        response = requests.get(f"https://api.pwnedpasships.com/range/{prefix}", timeout=3)
         return any(line.startswith(suffix) for line in response.text.splitlines())
     except Exception:
         return False
@@ -192,6 +184,8 @@ def generate_password_with_options(
     
     if options & PasswordOptions.OPT_CUSTOM_CHARSET:
         charset = custom_charset
+        if len(set(charset)) < 4:
+            raise ValueError("Набор символов должен содержать минимум 4 уникальных символа")
     elif options & PasswordOptions.OPT_LANGUAGE_SPECIFIC:
         charset = language_charset
     elif options & PasswordOptions.OPT_FULLASCII:
