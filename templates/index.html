@@ -23,6 +23,8 @@
         .weak { background: #ffcccc; }
         .medium { background: #fff3cd; }
         .strong { background: #d4edda; }
+        .warnings { margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 4px; }
+        .warning-list { margin: 5px 0; padding-left: 20px; }
     </style>
 </head>
 <body>
@@ -128,6 +130,18 @@
                         `${years} лет` : 
                         days > 0 ? `${days} дней` : "менее дня";
 
+                    let warningsHTML = '';
+                    if (data.warnings && data.warnings.length > 0) {
+                        warningsHTML = `
+                            <div class="warnings">
+                                <strong>⚠️ Проблемы:</strong>
+                                <ul class="warning-list">
+                                    ${data.warnings.map(w => `<li>${w}</li>`).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    }
+
                     document.getElementById('checkResult').innerHTML = `
                         <div class="status-item ${strengthClass}">
                             <div>🔐 Уровень безопасности: <strong>${data.strength}</strong></div>
@@ -137,6 +151,7 @@
                                 '⚠️ ВНИМАНИЕ! Пароль найден в утечках данных!' : 
                                 '✅ Пароль не обнаружен в известных утечках'}</div>
                             <div>💡 Рекомендация: ${data.recommendation}</div>
+                            ${warningsHTML}
                         </div>
                     `;
                 } else {
