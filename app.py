@@ -9,7 +9,6 @@ from typing import Tuple
 
 app = Flask(__name__)
 
-# Класс опций пароля
 class PasswordOptions(IntFlag):
     OPT_LOWERCASE = 1 << 0
     OPT_UPPERCASE = 1 << 1
@@ -25,7 +24,6 @@ class PasswordOptions(IntFlag):
     OPT_LANGUAGE_SPECIFIC = 1 << 11
     OPT_OUTPUT_FORMAT = 1 << 12
 
-# Основные функции
 def get_cryptographically_random_bytes(num_bytes: int) -> bytes:
     return secrets.token_bytes(num_bytes)
 
@@ -82,7 +80,7 @@ def check_password_strength(password: str) -> Tuple[int, float, float]:
     if char_set_size == 0: char_set_size = 1
     
     entropy = len(password) * math.log2(char_set_size)
-    time_to_crack = (2 ** entropy) / 1e10  # 10 млрд попыток/сек
+    time_to_crack = (2 ** entropy) / 1e10
     
     score = sum([has_lower, has_upper, has_digit, has_special])
     score += min(3, len(password) // 8)
@@ -103,7 +101,7 @@ def is_password_pwned(password: str) -> bool:
     try:
         sha1 = hashlib.sha1(password.encode()).hexdigest().upper()
         prefix, suffix = sha1[:5], sha1[5:]
-        response = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}")
+        response = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}", timeout=3)
         return any(line.startswith(suffix) for line in response.text.splitlines())
     except Exception:
         return False
@@ -156,7 +154,6 @@ def generate_password_with_options(
     
     return password[:length]
 
-# Маршруты Flask
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -166,7 +163,6 @@ def generate_password():
     try:
         data = request.get_json()
         
-        # Валидация данных
         if not data or 'length' not in data:
             return jsonify({"error": "Не указана длина пароля"}), 400
         
@@ -174,13 +170,11 @@ def generate_password():
         if length < 8 or length > 100:
             return jsonify({"error": "Некорректная длина пароля (8-100)"}), 400
         
-        # Парсинг опций
         options = 0
         for opt in data.get('options', []):
             if hasattr(PasswordOptions, opt):
                 options |= getattr(PasswordOptions, opt)
         
-        # Генерация пароля
         password = generate_password_with_options(
             length=length,
             options=PasswordOptions(options),
@@ -197,6 +191,39 @@ def generate_password():
     
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+@app.route('/check', methods=['POST'])
+def check_password():
+    try:
+        data = request.get_json()
+        
+        if not data or 'password' not in data:
+            return jsonify({"error": "Не указан пароль"}), 400
+        
+        password = data['password']
+        strength, entropy, time_to_crack = check_password_strength(password)
+        pwned = is_password_pwned(password)
+        
+        strength_labels = {
+            1: "Слабый",
+            2: "Средний",
+            3: "Надежный",
+            4: "Очень надежный",
+            5: "Ультра надежный"
+        }
+        
+        return jsonify({
+            "strength": strength_labels.get(strength, "Неизвестный"),
+            "entropy": round(entropy, 2),
+            "time_to_crack": round(time_to_crack, 2),
+            "compromised": pwned,
+            "recommendation": "Срочно измените пароль!" if pwned else 
+                            "Используйте более сложный пароль" if strength < 3 else 
+                            "Пароль соответствует стандартам безопасности"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
