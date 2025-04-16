@@ -2,27 +2,41 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Генератор паролей</title>
+    <title>Генератор и Проверка Паролей</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
         .container { border: 1px solid #ddd; padding: 20px; border-radius: 8px; }
-        .options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
+        .section { margin-bottom: 30px; }
+        .options-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
         button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
         button:hover { background: #0056b3; }
         .result { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px; }
         .error { color: #dc3545; }
+        input[type="number"], input[type="password"] { 
+            padding: 8px; 
+            margin: 5px 0; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            width: 200px; 
+        }
+        .status-item { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .weak { background: #ffcccc; }
+        .medium { background: #fff3cd; }
+        .strong { background: #d4edda; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Генератор безопасных паролей</h1>
-        
-        <div>
-            <label>Длина пароля: 
-                <input type="number" id="length" value="16" min="8" max="100">
-            </label>
+        <div class="section">
+            <h1>🔒 Генератор Паролей</h1>
+            <div>
+                <label>Длина пароля: 
+                    <input type="number" id="length" value="16" min="8" max="100">
+                </label>
+            </div>
             
-            <div class="options">
+            <h3>Настройки:</h3>
+            <div class="options-grid">
                 <label><input type="checkbox" name="option" value="OPT_LOWERCASE"> Строчные буквы</label>
                 <label><input type="checkbox" name="option" value="OPT_UPPERCASE"> Прописные буквы</label>
                 <label><input type="checkbox" name="option" value="OPT_DIGITS"> Цифры</label>
@@ -31,10 +45,16 @@
                 <label><input type="checkbox" name="option" value="OPT_AVOID_SIMILAR"> Исключить похожие</label>
             </div>
             
-            <button onclick="generatePassword()">Сгенерировать</button>
+            <button onclick="generatePassword()">Сгенерировать пароль</button>
+            <div class="result" id="generationResult"></div>
         </div>
 
-        <div class="result" id="result"></div>
+        <div class="section">
+            <h1>🔍 Проверка Пароля</h1>
+            <input type="password" id="passwordToCheck" placeholder="Введите пароль для проверки">
+            <button onclick="checkPassword()">Проверить безопасность</button>
+            <div class="result" id="checkResult"></div>
+        </div>
     </div>
 
     <script>
@@ -56,18 +76,76 @@
                 const data = await response.json();
                 
                 if (response.ok) {
-                    const strength = ['Слабый', 'Средний', 'Надежный', 'Очень надежный', 'Ультра надежный'][data.strength - 1];
-                    document.getElementById('result').innerHTML = `
-                        <strong>Пароль:</strong> ${data.password}<br>
-                        <strong>Надежность:</strong> ${strength}
+                    const strengthMap = {
+                        1: ['Слабый', 'weak'],
+                        2: ['Средний', 'medium'],
+                        3: ['Надежный', 'strong'],
+                        4: ['Очень надежный', 'strong'],
+                        5: ['Ультра надежный', 'strong']
+                    };
+                    const [strengthText, strengthClass] = strengthMap[data.strength] || ['Неизвестно', ''];
+                    
+                    document.getElementById('generationResult').innerHTML = `
+                        <div class="status-item ${strengthClass}">
+                            <strong>Сгенерированный пароль:</strong> ${data.password}<br>
+                            <strong>Уровень безопасности:</strong> ${strengthText}
+                        </div>
                     `;
                 } else {
-                    document.getElementById('result').innerHTML = 
-                        `<span class="error">Ошибка: ${data.error}</span>`;
+                    document.getElementById('generationResult').innerHTML = 
+                        `<div class="status-item error">Ошибка: ${data.error}</div>`;
                 }
             } catch (error) {
-                document.getElementById('result').innerHTML = 
-                    `<span class="error">Ошибка соединения</span>`;
+                document.getElementById('generationResult').innerHTML = 
+                    `<div class="status-item error">Ошибка соединения</div>`;
+            }
+        }
+
+        async function checkPassword() {
+            const password = document.getElementById('passwordToCheck').value;
+            if (!password) {
+                alert('Пожалуйста, введите пароль для проверки');
+                return;
+            }
+
+            try {
+                const response = await fetch('/check', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let strengthClass = 'weak';
+                    if (data.strength === 'Средний') strengthClass = 'medium';
+                    if (data.strength.includes('Надежный')) strengthClass = 'strong';
+
+                    const years = Math.floor(data.time_to_crack / (60*60*24*365));
+                    const days = Math.floor(data.time_to_crack / (60*60*24));
+                    const timeEstimate = years > 0 ? 
+                        `${years} лет` : 
+                        days > 0 ? `${days} дней` : "менее дня";
+
+                    document.getElementById('checkResult').innerHTML = `
+                        <div class="status-item ${strengthClass}">
+                            <div>🔐 Уровень безопасности: <strong>${data.strength}</strong></div>
+                            <div>📊 Энтропия: ${data.entropy} бит</div>
+                            <div>⏱ Примерное время взлома: ~${timeEstimate}</div>
+                            <div>${data.compromised ? 
+                                '⚠️ ВНИМАНИЕ! Пароль найден в утечках данных!' : 
+                                '✅ Пароль не обнаружен в известных утечках'}</div>
+                            <div>💡 Рекомендация: ${data.recommendation}</div>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('checkResult').innerHTML = 
+                        `<div class="status-item error">Ошибка: ${data.error}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('checkResult').innerHTML = 
+                    `<div class="status-item error">Ошибка соединения</div>`;
             }
         }
     </script>
