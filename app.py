@@ -4,8 +4,10 @@ import secrets
 import string
 import requests
 import hashlib
+import re
 from enum import IntFlag
-from typing import Tuple
+from typing import Tuple, List
+from collections import Counter
 
 app = Flask(__name__)
 
@@ -61,41 +63,113 @@ def add_separators(password: str, separator: str, group_size: int) -> str:
         result.append(char)
     return ''.join(result)
 
-def check_password_strength(password: str) -> Tuple[int, float, float]:
-    if len(password) < 8:
-        return 1, 0.0, 0.0
+def has_sequential_chars(password: str, min_seq: int = 3) -> bool:
+    sequences = [
+        '0123456789',
+        'abcdefghijklmnopqrstuvwxyz',
+        'qwertyuiopasdfghjklzxcvbnm'
+    ]
     
+    password_lower = password.lower()
+    for seq in sequences:
+        for i in range(len(seq) - min_seq + 1):
+            if seq[i:i+min_seq] in password_lower:
+                return True
+            if seq[i:i+min_seq][::-1] in password_lower:
+                return True
+    return False
+
+def check_unique_chars(password: str, min_unique: int = 4) -> bool:
+    return len(set(password)) >= min_unique
+
+def has_repeated_patterns(password: str, min_pattern_length: int = 2) -> bool:
+    for i in range(len(password) - min_pattern_length * 2 + 1):
+        pattern = password[i:i+min_pattern_length]
+        if pattern in password[i+min_pattern_length:]:
+            return True
+    return False
+
+def has_dates(password: str) -> bool:
+    patterns = [
+        r'\d{1,2}[./-]\d{1,2}[./-]\d{2,4}',
+        r'\d{4}',
+        r'(19|20)\d{2}'
+    ]
+    return any(re.search(p, password) for p in patterns)
+
+def has_uniform_distribution(password: str, threshold: float = 0.5) -> bool:
+    counts = Counter(password)
+    max_freq = max(counts.values()) / len(password)
+    return max_freq > threshold
+
+def check_password_strength(password: str) -> Tuple[int, float, float, List[str]]:
+    warnings = []
+    
+    if len(password) < 8:
+        return 1, 0.0, 0.0, ["Пароль слишком короткий (минимум 8 символов)"]
+    
+    # Анализ состава символов
     has_lower = any(c.islower() for c in password)
     has_upper = any(c.isupper() for c in password)
     has_digit = any(c.isdigit() for c in password)
     special_chars = "!@#$%^&*()_+~`|}{[]\\:;\"'<>?,./-="
     has_special = any(c in special_chars for c in password)
     
+    # Расчет размера набора символов
     char_set_size = 0
     if has_lower: char_set_size += 26
     if has_upper: char_set_size += 26
     if has_digit: char_set_size += 10
     if has_special: char_set_size += len(special_chars)
-    
     if char_set_size == 0: char_set_size = 1
     
+    # Расчет энтропии
     entropy = len(password) * math.log2(char_set_size)
-    time_to_crack = (2 ** entropy) / 1e10
+    time_to_crack = (2 ** entropy) / 1e10  # 10 млрд попыток/сек
     
+    # Базовый счетчик
     score = sum([has_lower, has_upper, has_digit, has_special])
     score += min(3, len(password) // 8)
     
+    # Дополнительные проверки
+    penalty = 0
+    if has_sequential_chars(password):
+        penalty += 1
+        warnings.append("Обнаружены последовательные символы")
+    
+    if not check_unique_chars(password):
+        penalty += 1
+        warnings.append("Слишком много повторяющихся символов")
+    
+    if has_repeated_patterns(password):
+        penalty += 1
+        warnings.append("Обнаружены повторяющиеся паттерны")
+    
+    if has_dates(password):
+        penalty += 1
+        warnings.append("Обнаружены даты или годы")
+    
+    if has_uniform_distribution(password):
+        penalty += 1
+        warnings.append("Неравномерное распределение символов")
+    
+    # Проверка повторов
     for i in range(len(password)-2):
         if password[i] == password[i+1] == password[i+2]:
-            return 1, entropy, time_to_crack
+            return 1, 0.0, 0.0, ["Обнаружены три повторяющихся символа подряд"]
     
+    # Корректировка счета
+    score -= penalty
+    if score < 1: score = 1
+    
+    # Определение уровня надежности
     strength = 1
     if score >= 8: strength = 5
     elif score >= 7: strength = 4
     elif score >= 5: strength = 3
     elif score >= 3: strength = 2
     
-    return strength, entropy, time_to_crack
+    return strength, entropy, time_to_crack, warnings
 
 def is_password_pwned(password: str) -> bool:
     try:
@@ -201,7 +275,7 @@ def check_password():
             return jsonify({"error": "Не указан пароль"}), 400
         
         password = data['password']
-        strength, entropy, time_to_crack = check_password_strength(password)
+        strength, entropy, time_to_crack, warnings = check_password_strength(password)
         pwned = is_password_pwned(password)
         
         strength_labels = {
@@ -217,6 +291,7 @@ def check_password():
             "entropy": round(entropy, 2),
             "time_to_crack": round(time_to_crack, 2),
             "compromised": pwned,
+            "warnings": warnings,
             "recommendation": "Срочно измените пароль!" if pwned else 
                             "Используйте более сложный пароль" if strength < 3 else 
                             "Пароль соответствует стандартам безопасности"
