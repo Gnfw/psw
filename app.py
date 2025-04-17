@@ -1,3 +1,4 @@
+# app.py
 from flask import Flask, render_template, request, jsonify
 import math
 import secrets
@@ -25,6 +26,8 @@ class PasswordOptions(IntFlag):
     OPT_CUSTOM_CHARSET = 1 << 10
     OPT_LANGUAGE_SPECIFIC = 1 << 11
     OPT_OUTPUT_FORMAT = 1 << 12
+    OPT_NO_REPEAT_CHARS = 1 << 13
+    OPT_UNICODE = 1 << 14
 
 def get_cryptographically_random_bytes(num_bytes: int) -> bytes:
     return secrets.token_bytes(num_bytes)
@@ -106,7 +109,7 @@ def check_password_strength(password: str) -> Tuple[int, float, float, List[str]
     warnings = []
     
     if len(password) < 8:
-        return 1, 0.0, 0.0, ["Пароль слишком короткий (минимум 8 символов)"]
+        warnings.append("Пароль слишком короткий (минимум 8 символов)")
     
     has_lower = any(c.islower() for c in password)
     has_upper = any(c.isupper() for c in password)
@@ -148,9 +151,12 @@ def check_password_strength(password: str) -> Tuple[int, float, float, List[str]
         penalty += 1
         warnings.append("Неравномерное распределение символов")
     
+    repeat_chars = False
     for i in range(len(password)-2):
         if password[i] == password[i+1] == password[i+2]:
-            return 1, 0.0, 0.0, ["Обнаружены три повторяющихся символа подряд"]
+            warnings.append("Обнаружены три повторяющихся символа подряд")
+            repeat_chars = True
+            break
     
     score -= penalty
     if score < 1: score = 1
@@ -167,7 +173,6 @@ def is_password_pwned(password: str) -> bool:
     try:
         sha1 = hashlib.sha1(password.encode()).hexdigest().upper()
         prefix, suffix = sha1[:5], sha1[5:]
-        # Исправленный URL для проверки утечек
         response = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}", timeout=3)
         return any(line.split(':')[0] == suffix for line in response.text.splitlines())
     except Exception:
@@ -189,6 +194,14 @@ def generate_password_with_options(
             raise ValueError("Набор символов должен содержать минимум 4 уникальных символа")
     elif options & PasswordOptions.OPT_LANGUAGE_SPECIFIC:
         charset = language_charset
+    elif options & PasswordOptions.OPT_UNICODE:
+        charset = ''.join(
+            chr(c) for c in 
+            list(range(0x0021, 0x007E)) + 
+            list(range(0x00A1, 0x00FF)) + 
+            list(range(0x0100, 0x017F)) + 
+            list(range(0x2000, 0x206F))
+    )
     elif options & PasswordOptions.OPT_FULLASCII:
         charset = string.printable[:94]
     else:
@@ -218,7 +231,7 @@ def generate_password_with_options(
     if options & PasswordOptions.OPT_SEPARATORS:
         password = add_separators(password, separator, group_size)
     
-    if options & PasswordOptions.OPT_NO_REPEAT:
+    if options & PasswordOptions.OPT_NO_REPEAT or options & PasswordOptions.OPT_NO_REPEAT_CHARS:
         password = ''.join(dict.fromkeys(password))
     
     return password[:length]
@@ -253,9 +266,16 @@ def generate_password():
             language_charset=data.get('language_charset', '')
         )
         
+        pwned = is_password_pwned(password)
+        strength, entropy, time_to_crack, warnings = check_password_strength(password)
+        
         return jsonify({
             "password": password,
-            "strength": check_password_strength(password)[0]
+            "strength": strength,
+            "compromised": pwned,
+            "warnings": warnings,
+            "entropy": entropy,
+            "time_to_crack": time_to_crack
         })
     
     except Exception as e:
