@@ -33,7 +33,7 @@ class PasswordOptions(IntFlag):
 
 DICTIONARY_URLS = {
     'english': 'https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt',
-    'russian': 'https://raw.githubusercontent.com/LinguaLeo/russian-nouns/master/src/russian_nouns.txt'
+    'russian': 'https://raw.githubusercontent.com/danakt/russian-words/master/russian.txt'
 }
 
 DICTIONARY = set()
@@ -44,15 +44,15 @@ def load_online_dictionary(url: str) -> set:
         response.raise_for_status()
         return set(word.strip().lower() for word in response.text.splitlines() if word.strip())
     except Exception as e:
-        logger.error(f"Dictionary load error: {e}")
+        logger.error(f"Ошибка загрузки словаря: {e}")
         return set()
 
 try:
     DICTIONARY.update(load_online_dictionary(DICTIONARY_URLS['english']))
     DICTIONARY.update(load_online_dictionary(DICTIONARY_URLS['russian']))
-    logger.info(f"Loaded {len(DICTIONARY)} dictionary words")
+    logger.info(f"Загружено слов из словарей: {len(DICTIONARY)}")
 except Exception as e:
-    logger.error(f"Failed to load dictionaries: {e}")
+    logger.error(f"Не удалось загрузить словари: {e}")
 
 def get_cryptographically_random_bytes(num_bytes: int) -> bytes:
     return secrets.token_bytes(num_bytes)
