@@ -6,7 +6,7 @@ import requests
 import hashlib
 import re
 from enum import IntFlag
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 from collections import Counter
 
 app = Flask(__name__)
@@ -35,33 +35,37 @@ def bytes_to_uniform_chars(random_bytes: bytes, charset: str) -> str:
     
     char_set_size = len(charset)
     result = []
+    max_index = char_set_size - 1
     
-    for i in range(0, len(random_bytes), 4):
-        chunk = random_bytes[i:i+4]
-        value = int.from_bytes(chunk, byteorder='big')
-        
-        while value > 0:
-            result.append(charset[value % char_set_size])
-            value = value // char_set_size
+    # Используем rejection sampling для равномерного распределения
+    for byte in random_bytes:
+        # Генерируем индекс с использованием всех битов
+        for shift in [0, 2, 4, 6]:  # Используем 2 бита за итерацию (4 значения на байт)
+            bits = (byte >> shift) & 0x03
+            # Генерируем случайное число с помощью secrets.randbelow для устранения смещения
+            if max_index > 0:
+                index = secrets.randbelow(char_set_size)
+                result.append(charset[index])
     
     return ''.join(result)
 
 def generate_strong_password(length: int, charset: str) -> str:
-    required_bytes = math.ceil(length * 2)
-    random_bytes = get_cryptographically_random_bytes(required_bytes)
+    # Вычисляем необходимые байты с запасом
+    char_set_size = len(charset)
+    bits_per_char = math.log2(char_set_size) if char_set_size > 0 else 0
+    required_bits = length * bits_per_char
+    required_bytes = max(math.ceil(required_bits / 8), 1)
+    
+    random_bytes = get_cryptographically_random_bytes(required_bytes * 2)  # Запас
     password = bytes_to_uniform_chars(random_bytes, charset)
     return password[:length]
 
 def add_separators(password: str, separator: str, group_size: int) -> str:
-    if group_size <= 0:
+    if group_size <= 0 or len(password) <= group_size:
         return password
     
-    result = []
-    for i, char in enumerate(password):
-        if i > 0 and i % group_size == 0:
-            result.append(separator)
-        result.append(char)
-    return ''.join(result)
+    chunks = [password[i:i+group_size] for i in range(0, len(password), group_size)]
+    return separator.join(chunks)
 
 def has_sequential_chars(password: str, min_seq: int = 3) -> bool:
     sequences = [
@@ -80,7 +84,7 @@ def has_sequential_chars(password: str, min_seq: int = 3) -> bool:
     return False
 
 def check_unique_chars(password: str, min_unique: int = 4) -> bool:
-    return len(set(password)) >= min_unique
+    return len(set(password)) >= min_unique if len(password) >= min_unique else False
 
 def has_repeated_patterns(password: str, min_pattern_length: int = 2) -> bool:
     for i in range(len(password) - min_pattern_length * 2 + 1):
@@ -97,10 +101,32 @@ def has_dates(password: str) -> bool:
     ]
     return any(re.search(p, password) for p in patterns)
 
-def has_uniform_distribution(password: str, threshold: float = 0.5) -> bool:
+def has_uniform_distribution(password: str, threshold: float = 0.25) -> bool:
     counts = Counter(password)
-    max_freq = max(counts.values()) / len(password)
+    max_freq = max(counts.values()) / len(password) if password else 0
     return max_freq > threshold
+
+def calculate_entropy(password: str) -> float:
+    if not password:
+        return 0.0
+    
+    charset = set(password)
+    char_set_size = 0
+    
+    has_lower = any(c.islower() for c in charset)
+    has_upper = any(c.isupper() for c in charset)
+    has_digit = any(c.isdigit() for c in charset)
+    special_chars = "!@#$%^&*()_+~`|}{[]\\:;\"'<>?,./-="
+    has_special = any(c in special_chars for c in charset)
+    
+    if has_lower: char_set_size += 26
+    if has_upper: char_set_size += 26
+    if has_digit: char_set_size += 10
+    if has_special: char_set_size += len(special_chars)
+    
+    # Учитываем реальный размер используемого набора символов
+    real_charset_size = len(charset) or 1
+    return len(password) * math.log2(real_charset_size) if real_charset_size > 0 else 0
 
 def check_password_strength(password: str) -> Tuple[int, float, float, List[str]]:
     warnings = []
@@ -108,25 +134,21 @@ def check_password_strength(password: str) -> Tuple[int, float, float, List[str]
     if len(password) < 8:
         return 1, 0.0, 0.0, ["Пароль слишком короткий (минимум 8 символов)"]
     
+    # Основные проверки
+    entropy = calculate_entropy(password)
+    time_to_crack = (2 ** entropy) / (1e12)  # Предполагаем 1 триллион попыток в секунду
+    
+    score = 0
     has_lower = any(c.islower() for c in password)
     has_upper = any(c.isupper() for c in password)
     has_digit = any(c.isdigit() for c in password)
     special_chars = "!@#$%^&*()_+~`|}{[]\\:;\"'<>?,./-="
     has_special = any(c in special_chars for c in password)
     
-    char_set_size = 0
-    if has_lower: char_set_size += 26
-    if has_upper: char_set_size += 26
-    if has_digit: char_set_size += 10
-    if has_special: char_set_size += len(special_chars)
-    if char_set_size == 0: char_set_size = 1
+    score += has_lower + has_upper + has_digit + has_special
+    score += min(3, len(password) // 6)
     
-    entropy = len(password) * math.log2(char_set_size)
-    time_to_crack = (2 ** entropy) / 1e10
-    
-    score = sum([has_lower, has_upper, has_digit, has_special])
-    score += min(3, len(password) // 8)
-    
+    # Штрафы
     penalty = 0
     if has_sequential_chars(password):
         penalty += 1
@@ -148,18 +170,29 @@ def check_password_strength(password: str) -> Tuple[int, float, float, List[str]
         penalty += 1
         warnings.append("Неравномерное распределение символов")
     
+    # Проверка на повторяющиеся символы
     for i in range(len(password)-2):
         if password[i] == password[i+1] == password[i+2]:
-            return 1, 0.0, 0.0, ["Обнаружены три повторяющихся символа подряд"]
+            penalty += 2
+            warnings.append("Обнаружены три повторяющихся символа подряд")
     
-    score -= penalty
-    if score < 1: score = 1
+    score = max(1, score - penalty)
+    
+    # Определение уровня сложности
+    strength_levels = [
+        (1, 30),   # Слабый
+        (2, 50),   # Средний
+        (3, 70),   # Надежный
+        (4, 90),   # Очень надежный
+        (5, float('inf'))  # Ультра
+    ]
     
     strength = 1
-    if score >= 8: strength = 5
-    elif score >= 7: strength = 4
-    elif score >= 5: strength = 3
-    elif score >= 3: strength = 2
+    for level, threshold in strength_levels:
+        if entropy >= threshold:
+            strength = level
+        else:
+            break
     
     return strength, entropy, time_to_crack, warnings
 
@@ -167,8 +200,8 @@ def is_password_pwned(password: str) -> bool:
     try:
         sha1 = hashlib.sha1(password.encode()).hexdigest().upper()
         prefix, suffix = sha1[:5], sha1[5:]
-        response = requests.get(f"https://api.pwnedpasships.com/range/{prefix}", timeout=3)
-        return any(line.startswith(suffix) for line in response.text.splitlines())
+        response = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}", timeout=3)
+        return any(line.split(':')[0] == suffix for line in response.text.splitlines())
     except Exception:
         return False
 
@@ -209,16 +242,32 @@ def generate_password_with_options(
     if not charset:
         raise ValueError("Не удалось создать набор символов")
     
-    password = generate_strong_password(length, charset)
+    # Генерация с учетом ограничений
+    original_length = length
+    if options & PasswordOptions.OPT_SEPARATORS:
+        num_separators = (original_length - 1) // group_size
+        original_length = max(original_length - num_separators, 1)
     
+    if options & PasswordOptions.OPT_NO_REPEAT:
+        charset = ''.join(set(charset))
+        if len(charset) < original_length:
+            raise ValueError("Недостаточно уникальных символов для генерации пароля")
+        password = ''.join(secrets.choice(charset) for _ in range(original_length))
+    else:
+        password = generate_strong_password(original_length, charset)
+    
+    # Применение дополнительных опций
     if options & PasswordOptions.OPT_RANDOM_CASE:
-        password = ''.join(secrets.choice([c.upper(), c.lower()]) for c in password)
+        password = ''.join(
+            secrets.choice([c.upper(), c.lower()]) if c.isalpha() else c
+            for c in password
+        )
     
     if options & PasswordOptions.OPT_SEPARATORS:
         password = add_separators(password, separator, group_size)
     
-    if options & PasswordOptions.OPT_NO_REPEAT:
-        password = ''.join(dict.fromkeys(password))
+    if options & PasswordOptions.OPT_NO_REPEAT and len(password) > original_length:
+        password = password[:original_length]
     
     return password[:length]
 
@@ -257,8 +306,11 @@ def generate_password():
             "strength": check_password_strength(password)[0]
         })
     
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        app.logger.error(f"Error generating password: {str(e)}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 @app.route('/check', methods=['POST'])
 def check_password():
@@ -292,7 +344,8 @@ def check_password():
         })
         
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        app.logger.error(f"Error checking password: {str(e)}")
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
