@@ -18,9 +18,16 @@ class PasswordOptions(IntFlag):
     OPT_SPECIAL = 1 << 3
     OPT_NO_DIGITS = 1 << 4
     OPT_AVOID_SIMILAR = 1 << 7
+    OPT_NO_REPEAT = 1 << 8
 
-def generate_strong_password(length: int, charset: str) -> str:
-    return ''.join(secrets.choice(charset) for _ in range(length))
+def generate_strong_password(length: int, charset: str, no_repeat: bool) -> str:
+    charset_list = list(charset)
+    if no_repeat:
+        if len(set(charset_list)) < length:
+            raise ValueError("Недостаточно уникальных символов")
+        secrets.SystemRandom().shuffle(charset_list)
+        return ''.join(charset_list[:length])
+    return ''.join(secrets.choice(charset_list) for _ in range(length))
 
 def check_password_strength(password: str) -> Tuple[int, float, float, List[str]]:
     warnings = []
@@ -33,7 +40,6 @@ def check_password_strength(password: str) -> Tuple[int, float, float, List[str]
     entropy = length * math.log2(unique_chars) if unique_chars > 0 else 0
     time_to_crack = (2 ** entropy) / 1e9  # 1 миллиард попыток/сек
     
-    # Определение уровня сложности
     strength_levels = [
         (5, 120, "Ультра надежный"),
         (4, 80, "Очень надежный"),
@@ -47,7 +53,7 @@ def check_password_strength(password: str) -> Tuple[int, float, float, List[str]
     # Проверка проблем
     if re.search(r'(.)\1{2}', password):
         warnings.append("Повторяющиеся символы")
-    if len(set(password)) < 4:
+    if unique_chars < 4:
         warnings.append("Мало уникальных символов")
     
     return strength, round(entropy, 2), time_to_crack, warnings
@@ -71,31 +77,41 @@ def handle_generate():
         data = request.get_json()
         length = int(data.get('length', 12))
         options = PasswordOptions(0)
+        no_repeat = PasswordOptions.OPT_NO_REPEAT in options
         
-        for opt in data.get('options', []):
-            if hasattr(PasswordOptions, opt):
-                options |= getattr(PasswordOptions, opt)
+        # Формирование charset
+        charset = []
+        if PasswordOptions.OPT_LOWERCASE in options:
+            charset.extend(string.ascii_lowercase)
+        if PasswordOptions.OPT_UPPERCASE in options:
+            charset.extend(string.ascii_uppercase)
+        if PasswordOptions.OPT_DIGITS in options and not PasswordOptions.OPT_NO_DIGITS in options:
+            charset.extend(string.digits)
+        if PasswordOptions.OPT_SPECIAL in options:
+            charset.extend('!@#$%^&*()_+-=')
+            
+        if PasswordOptions.OPT_AVOID_SIMILAR in options:
+            charset = [c for c in charset if c not in 'lI10Oo']
         
-        charset = ''
-        if options & PasswordOptions.OPT_LOWERCASE:
-            charset += string.ascii_lowercase
-        if options & PasswordOptions.OPT_UPPERCASE:
-            charset += string.ascii_uppercase
-        if options & PasswordOptions.OPT_DIGITS and not options & PasswordOptions.OPT_NO_DIGITS:
-            charset += string.digits
-        if options & PasswordOptions.OPT_SPECIAL:
-            charset += '!@#$%^&*()_+-='
-        
-        if options & PasswordOptions.OPT_AVOID_SIMILAR:
-            charset = ''.join(c for c in charset if c not in 'lI10Oo')
+        charset = list(set(charset))  # Уникальные символы
         
         if not charset:
-            raise ValueError("Невозможно создать пароль с выбранными опциями")
+            raise ValueError("Недостаточно символов для генерации")
         
-        password = generate_strong_password(length, charset)
+        # Генерация пароля
+        password = generate_strong_password(length, charset, no_repeat)
+        
+        # Проверка на повторения при активированной опции
+        if no_repeat and len(set(password)) != len(password):
+            raise ValueError("Ошибка генерации без повторов")
+        
         strength, *_ = check_password_strength(password)
         
-        return jsonify({"password": password, "strength": strength})
+        return jsonify({
+            "password": password,
+            "strength": strength,
+            "entropy": check_password_strength(password)[1]
+        })
     
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -118,7 +134,7 @@ def handle_check():
         }
         
         return jsonify({
-            "strength": strength_labels[strength],
+            "strength": strength_labels.get(strength, "Неизвестно"),
             "entropy": entropy,
             "time_to_crack": time,
             "compromised": pwned,
