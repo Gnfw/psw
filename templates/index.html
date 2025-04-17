@@ -3,210 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Password Security Pro</title>
+    <title>Password Manager Pro</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-            --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+            --primary: #485fc7;
+            --background: #f8f9fa;
         }
 
-        .hero-section {
-            background: var(--primary-gradient);
-            padding: 4rem 1.5rem;
-            border-radius: 0 0 20px 20px;
+        body {
+            background: var(--background);
+            min-height: 100vh;
+            padding: 2rem;
         }
 
-        .card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: var(--card-shadow);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            margin: 1.5rem 0;
+        .password-card {
+            max-width: 600px;
+            margin: 0 auto;
+            border-radius: 10px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
         }
 
-        .card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: none;
         }
 
-        .password-input {
-            padding-right: 3.5rem;
+        .modal-card {
+            width: 90%;
+            max-width: 500px;
+        }
+
+        .password-output {
             font-family: 'Courier New', monospace;
-            font-weight: bold;
-        }
-
-        .strength-bar {
-            height: 8px;
-            border-radius: 4px;
-            transition: width 0.3s ease;
-        }
-
-        .options-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1.2rem;
-            padding: 1.5rem 0;
-        }
-
-        .option-item {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-            padding: 1rem;
-            border-radius: 8px;
-            background: #f8f9fa;
-            transition: all 0.2s ease;
-            border: 1px solid #e9ecef;
-        }
-
-        .option-item:hover {
-            background: #ffffff;
-            border-color: #ced4da;
-            transform: translateY(-2px);
-        }
-
-        .length-warning {
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.6; }
-            100% { opacity: 1; }
+            font-size: 1.2rem;
+            letter-spacing: 1px;
         }
     </style>
 </head>
 <body>
-    <section class="hero-section">
-        <div class="container">
-            <h1 class="title has-text-centered has-text-white mb-4">Password Security Pro</h1>
-            <p class="subtitle has-text-centered has-text-white-ter">Генерация и анализ криптостойких паролей</p>
-        </div>
-    </section>
+    <div class="password-card card">
+        <div class="card-content">
+            <h1 class="title has-text-centered">🔐 Генератор паролей</h1>
+            
+            <div class="field">
+                <label class="label">Длина пароля</label>
+                <input class="input" type="number" id="length" value="12" min="8" max="100">
+            </div>
 
-    <section class="section">
-        <div class="container">
-            <!-- Генератор паролей -->
-            <div class="card">
-                <div class="card-content">
-                    <h2 class="title is-4 has-text-grey-dark">🎲 Генератор паролей</h2>
-                    
-                    <div class="field">
-                        <label class="label">Длина пароля</label>
-                        <div class="control has-icons-right">
-                            <input class="input" type="number" id="length" min="4" max="100" value="12" 
-                                   oninput="validateLength(this)">
-                            <span class="icon is-right">
-                                <i class="fas fa-ruler-horizontal"></i>
-                            </span>
-                        </div>
-                        <p class="help is-danger length-warning" id="length-warning" hidden>
-                            ⚠️ Для надежности рекомендуется минимум 8 символов
-                        </p>
-                    </div>
-
-                    <div class="options-grid">
-                        <label class="checkbox option-item">
-                            <input type="checkbox" class="option" value="OPT_LOWERCASE" checked>
-                            <span class="has-text-weight-semibold">a-z</span> Строчные буквы
-                        </label>
-                        
-                        <label class="checkbox option-item">
-                            <input type="checkbox" class="option" value="OPT_UPPERCASE">
-                            <span class="has-text-weight-semibold">A-Z</span> Заглавные буквы
-                        </label>
-
-                        <label class="checkbox option-item">
-                            <input type="checkbox" class="option" value="OPT_DIGITS" checked>
-                            <span class="has-text-weight-semibold">0-9</span> Цифры
-                        </label>
-
-                        <label class="checkbox option-item">
-                            <input type="checkbox" class="option" value="OPT_SPECIAL">
-                            <span class="has-text-weight-semibold">!@#</span> Спецсимволы
-                        </label>
-
-                        <label class="checkbox option-item">
-                            <input type="checkbox" class="option" value="OPT_NO_DIGITS">
-                            <span class="icon has-text-danger"><i class="fas fa-ban"></i></span> Без цифр
-                        </label>
-
-                        <label class="checkbox option-item">
-                            <input type="checkbox" class="option" value="OPT_AVOID_SIMILAR">
-                            <span class="icon has-text-info"><i class="fas fa-eye-slash"></i></span> Исключить похожие
-                        </label>
-
-                        <label class="checkbox option-item">
-                            <input type="checkbox" class="option" value="OPT_SEPARATORS">
-                            <span class="icon has-text-success"><i class="fas fa-grip-lines"></i></span> Разделители
-                        </label>
-
-                        <label class="checkbox option-item">
-                            <input type="checkbox" class="option" value="OPT_NO_REPEAT">
-                            <span class="icon has-text-warning"><i class="fas fa-repeat"></i></span> Без повторов
-                        </label>
-
-                        <label class="checkbox option-item">
-                            <input type="checkbox" class="option" value="OPT_RANDOM_CASE">
-                            <span class="icon has-text-primary"><i class="fas fa-random"></i></span> Случайный регистр
-                        </label>
-                    </div>
-
-                    <div class="buttons is-justify-content-center mt-5">
-                        <button class="button is-primary is-rounded has-text-weight-bold" 
-                                onclick="generatePassword()">
-                            Сгенерировать
-                        </button>
-                    </div>
-
-                    <div class="field has-addons">
-                        <div class="control is-expanded">
-                            <input class="input password-input" 
-                                   type="text" 
-                                   id="generated-password" 
-                                   readonly
-                                   placeholder="Ваш пароль появится здесь">
-                        </div>
-                        <div class="control">
-                            <button class="button is-info is-rounded" 
-                                    onclick="copyPassword()"
-                                    title="Скопировать">
-                                <span class="icon"><i class="fas fa-copy"></i></span>
-                            </button>
-                        </div>
-                    </div>
+            <div class="field">
+                <label class="label">Опции</label>
+                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.8rem;">
+                    <label class="checkbox">
+                        <input type="checkbox" class="option" value="OPT_LOWERCASE" checked>
+                        Строчные (a-z)
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" class="option" value="OPT_UPPERCASE">
+                        Заглавные (A-Z)
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" class="option" value="OPT_DIGITS" checked>
+                        Цифры (0-9)
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" class="option" value="OPT_SPECIAL">
+                        Спецсимволы
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" class="option" value="OPT_NO_REPEAT">
+                        Без повторов
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" class="option" value="OPT_AVOID_SIMILAR">
+                        Без похожих
+                    </label>
                 </div>
             </div>
 
-            <!-- Проверка пароля -->
-            <div class="card">
-                <div class="card-content">
-                    <h2 class="title is-4 has-text-grey-dark">🔍 Проверка пароля</h2>
-                    
-                    <div class="field">
-                        <div class="control has-icons-right">
-                            <input class="input password-input" 
-                                   type="password" 
-                                   id="check-password" 
-                                   placeholder="Введите пароль для проверки"
-                                   oninput="checkPasswordDebounced()">
-                            <span class="icon is-right toggle-password" 
-                                  onclick="togglePasswordVisibility()"
-                                  style="pointer-events: all; cursor: pointer">
-                                <i class="fas fa-eye"></i>
-                            </span>
-                        </div>
-                    </div>
+            <button class="button is-primary is-fullwidth" onclick="generatePassword()">
+                Сгенерировать пароль
+            </button>
 
-                    <div id="result">
-                        <!-- Динамическое содержимое -->
-                    </div>
+            <div class="field has-addons mt-4">
+                <div class="control is-expanded">
+                    <input class="input password-output" id="generated-password" readonly>
+                </div>
+                <div class="control">
+                    <button class="button" onclick="copyPassword()">
+                        📋 Копировать
+                    </button>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+
+    <!-- Модальное окно результатов -->
+    <div class="modal" id="result-modal">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title" id="result-title"></p>
+                <button class="delete" onclick="hideModal()"></button>
+            </header>
+            <section class="modal-card-body" id="result-content"></section>
+        </div>
+    </div>
+
+    <!-- Уведомления -->
+    <div class="notification" id="toast"></div>
 
     <script>
         const API_URLS = {
@@ -214,151 +122,65 @@
             CHECK: '/check'
         };
 
-        const optionsMap = {
-            'OPT_LOWERCASE': 1 << 0,
-            'OPT_UPPERCASE': 1 << 1,
-            'OPT_DIGITS': 1 << 2,
-            'OPT_SPECIAL': 1 << 3,
-            'OPT_NO_DIGITS': 1 << 4,
-            'OPT_SEPARATORS': 1 << 5,
-            'OPT_FULLASCII': 1 << 6,
-            'OPT_AVOID_SIMILAR': 1 << 7,
-            'OPT_NO_REPEAT': 1 << 8,
-            'OPT_RANDOM_CASE': 1 << 9,
-            'OPT_CUSTOM_CHARSET': 1 << 10,
-            'OPT_LANGUAGE_SPECIFIC': 1 << 11,
-            'OPT_OUTPUT_FORMAT': 1 << 12
-        };
-
-        // Валидация длины пароля
-        function validateLength(input) {
-            const warning = document.getElementById('length-warning');
-            warning.hidden = input.value >= 8;
-        }
-
-        // Генерация пароля
         async function generatePassword() {
             try {
                 const options = Array.from(document.querySelectorAll('.option:checked'))
-                    .map(checkbox => checkbox.value)
-                    .reduce((acc, val) => acc | optionsMap[val], 0);
-
-                const length = parseInt(document.getElementById('length').value) || 12;
+                    .map(checkbox => checkbox.value);
+                
+                const length = parseInt(document.getElementById('length').value);
+                const noRepeat = options.includes('OPT_NO_REPEAT');
 
                 const response = await fetch(API_URLS.GENERATE, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        length, 
-                        options: Object.keys(optionsMap).filter(key => (options & optionsMap[key]) !== 0) 
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        length,
+                        options,
+                        no_repeat: noRepeat
                     })
                 });
 
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.error || 'Ошибка генерации');
-                
+
                 document.getElementById('generated-password').value = data.password;
-                showNotification('Пароль успешно сгенерирован!', 'is-success');
-
-            } catch (error) {
-                showNotification(error.message, 'is-danger');
-            }
-        }
-
-        // Проверка пароля
-        const checkPasswordDebounced = debounce(checkPassword, 500);
-
-        async function checkPassword() {
-            try {
-                const password = document.getElementById('check-password').value;
-                if (!password) return;
-
-                const response = await fetch(API_URLS.CHECK, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
-                });
-
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.error || 'Ошибка проверки');
+                showResult(data);
                 
-                displayCheckResult(result);
-
             } catch (error) {
-                showNotification(error.message, 'is-danger');
+                showToast(error.message, 'is-danger');
             }
         }
 
-        // Отображение результатов проверки
-        function displayCheckResult(result) {
-            const strengthColors = {
-                'Слабый': 'is-danger',
-                'Средний': 'is-warning',
-                'Надежный': 'is-success',
-                'Очень надежный': 'is-primary',
-                'Ультра надежный': 'is-info'
+        function showResult(data) {
+            const strengthMap = {
+                1: 'Слабый',
+                2: 'Средний',
+                3: 'Надежный',
+                4: 'Очень надежный',
+                5: 'Ультра надежный'
             };
-
-            const strengthBar = `
-                <div class="strength-bar-container mb-4">
-                    <div class="strength-bar ${strengthColors[result.strength]}" 
-                         style="width: ${result.strength * 20}%"></div>
+            
+            const title = document.getElementById('result-title');
+            const content = document.getElementById('result-content');
+            
+            title.textContent = `Надежность: ${strengthMap[data.strength]}`;
+            title.className = `modal-card-title has-text-${getStrengthColor(data.strength)}`;
+            
+            content.innerHTML = `
+                <div class="content">
+                    <p>Энтропия: <strong>${data.entropy} бит</strong></p>
+                    <p>Примерное время взлома: <strong>${formatTime(data.time_to_crack)}</strong></p>
                 </div>
             `;
 
-            const resultHTML = `
-                <div class="notification ${strengthColors[result.strength]}">
-                    ${strengthBar}
-                    <h4 class="title is-5 mb-3">Результат проверки</h4>
-                    
-                    <div class="content">
-                        <p><strong>Уровень сложности:</strong> ${result.strength}</p>
-                        <p><strong>Энтропия:</strong> ${result.entropy} бит</p>
-                        <p><strong>Время взлома:</strong> ${formatTime(result.time_to_crack)}</p>
-                        <p><strong>Утечка данных:</strong> ${result.compromised ? '⚠️ Обнаружена' : '✅ Не обнаружена'}</p>
-                        
-                        ${result.warnings.length ? `
-                        <div class="mt-3">
-                            <p class="has-text-weight-bold">Предупреждения:</p>
-                            <ul class="mt-1">${result.warnings.map(w => `<li>• ${w}</li>`).join('')}</ul>
-                        </div>` : ''}
-                        
-                        <div class="mt-3">
-                            <p class="has-text-weight-bold">Рекомендация:</p>
-                            <p class="has-text-grey-dark">${result.recommendation}</p>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            document.getElementById('result').innerHTML = resultHTML;
+            document.getElementById('result-modal').classList.add('is-active');
         }
 
-        // Вспомогательные функции
-        function debounce(func, timeout = 300) {
-            let timer;
-            return (...args) => {
-                clearTimeout(timer);
-                timer = setTimeout(() => { func.apply(this, args); }, timeout);
-            };
-        }
-
-        function copyPassword() {
-            const passField = document.getElementById('generated-password');
-            navigator.clipboard.writeText(passField.value).then(() => {
-                showNotification('Пароль скопирован!', 'is-success');
-            });
-        }
-
-        function togglePasswordVisibility() {
-            const passField = document.getElementById('check-password');
-            const icon = document.querySelector('.toggle-password i');
-            passField.type = passField.type === 'password' ? 'text' : 'password';
-            icon.classList.toggle('fa-eye-slash');
+        function getStrengthColor(strength) {
+            return ['danger', 'warning', 'success', 'info', 'primary'][strength - 1] || 'dark';
         }
 
         function formatTime(seconds) {
-            if (seconds < 1) return 'мгновенно';
             const units = [
                 {name: 'лет', div: 31536000},
                 {name: 'месяцев', div: 2592000},
@@ -375,13 +197,22 @@
             return `${Math.round(seconds)} секунд`;
         }
 
-        function showNotification(text, type = 'is-info') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.textContent = text;
-            
-            document.body.appendChild(notification);
-            setTimeout(() => notification.remove(), 3000);
+        function hideModal() {
+            document.getElementById('result-modal').classList.remove('is-active');
+        }
+
+        function copyPassword() {
+            const passField = document.getElementById('generated-password');
+            navigator.clipboard.writeText(passField.value);
+            showToast('Пароль скопирован!', 'is-success');
+        }
+
+        function showToast(message, type = 'is-info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `notification ${type}`;
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 3000);
         }
     </script>
 </body>
