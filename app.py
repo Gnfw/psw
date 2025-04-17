@@ -91,9 +91,14 @@ def is_dictionary_word(password: str) -> bool:
     if not DICTIONARY:
         return False
     
-    # Ищем только полные слова длиной от 4 символов
-    words = re.findall(r'\b[a-zа-яё]{4,}\b', password.lower())
-    return any(word in DICTIONARY for word in words)
+ # Ищем все буквенные последовательности от 4 символов
+    words = re.findall(r'[a-zа-яё]{4,}', password.lower())
+  # Удаляем числа и проверяем оставшиеся части
+    cleaned_password = re.sub(r'\d+', ' ', password.lower())
+    parts = [word for word in cleaned_password.split() if len(word) >= 4]
+    
+    # Проверяем все возможные варианты
+    return any(word in DICTIONARY for word in words + parts)
 
 def check_password_strength(password: str) -> Tuple[int, float, float, List[str]]:
     warnings = []
