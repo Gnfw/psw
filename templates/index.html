@@ -1,195 +1,300 @@
-<script>
-    // Конфигурация
-    const API_URLS = {
-        GENERATE: '/generate',
-        CHECK: '/check'
-    };
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Security Toolkit</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .password-field { position: relative; }
+        .toggle-password { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; }
+        .box:hover { transform: translateY(-5px); transition: all 0.3s ease; }
+        .footer { background-color: #f5f5f5; padding: 2rem 1.5rem; }
+        .notification { margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <section class="hero is-medium">
+        <div class="hero-body">
+            <div class="container has-text-centered">
+                <h1 class="title has-text-white">Password Security Toolkit</h1>
+                <p class="subtitle has-text-white">Генерация и анализ надёжных паролей</p>
+            </div>
+        </div>
+    </section>
 
-    // Обработчики опций
-    const optionsMap = {
-        'OPT_LOWERCASE': PasswordOptions.OPT_LOWERCASE,
-        'OPT_UPPERCASE': PasswordOptions.OPT_UPPERCASE,
-        'OPT_DIGITS': PasswordOptions.OPT_DIGITS,
-        'OPT_SPECIAL': PasswordOptions.OPT_SPECIAL,
-        'OPT_NO_DIGITS': PasswordOptions.OPT_NO_DIGITS,
-        'OPT_SEPARATORS': PasswordOptions.OPT_SEPARATORS,
-        'OPT_FULLASCII': PasswordOptions.OPT_FULLASCII,
-        'OPT_AVOID_SIMILAR': PasswordOptions.OPT_AVOID_SIMILAR,
-        'OPT_NO_REPEAT': PasswordOptions.OPT_NO_REPEAT,
-        'OPT_RANDOM_CASE': PasswordOptions.OPT_RANDOM_CASE,
-        'OPT_CUSTOM_CHARSET': PasswordOptions.OPT_CUSTOM_CHARSET,
-        'OPT_LANGUAGE_SPECIFIC': PasswordOptions.OPT_LANGUAGE_SPECIFIC,
-        'OPT_OUTPUT_FORMAT': PasswordOptions.OPT_OUTPUT_FORMAT
-    };
+    <section class="section">
+        <div class="container">
+            <!-- Генератор паролей -->
+            <div class="box">
+                <h2 class="title is-4">🔐 Генератор паролей</h2>
+                <div class="field">
+                    <label class="label">Длина пароля</label>
+                    <div class="control">
+                        <input class="input" type="number" id="length" min="8" max="100" value="12">
+                    </div>
+                </div>
 
-    // Генерация пароля
-    async function generatePassword() {
-        try {
-            const options = Array.from(document.querySelectorAll('.option:checked'))
-                .map(checkbox => checkbox.value)
-                .reduce((acc, val) => acc | optionsMap[val], 0);
+                <div class="field">
+                    <label class="label">Опции</label>
+                    <div class="columns is-multiline">
+                        <div class="column is-4">
+                            <label class="checkbox">
+                                <input type="checkbox" class="option" value="OPT_LOWERCASE" checked>
+                                Строчные буквы (a-z)
+                            </label>
+                        </div>
+                        <div class="column is-4">
+                            <label class="checkbox">
+                                <input type="checkbox" class="option" value="OPT_UPPERCASE">
+                                Заглавные буквы (A-Z)
+                            </label>
+                        </div>
+                        <div class="column is-4">
+                            <label class="checkbox">
+                                <input type="checkbox" class="option" value="OPT_DIGITS" checked>
+                                Цифры (0-9)
+                            </label>
+                        </div>
+                        <div class="column is-4">
+                            <label class="checkbox">
+                                <input type="checkbox" class="option" value="OPT_SPECIAL">
+                                Спецсимволы (!@#...)
+                            </label>
+                        </div>
+                        <div class="column is-4">
+                            <label class="checkbox">
+                                <input type="checkbox" class="option" value="OPT_NO_DIGITS">
+                                Исключить цифры
+                            </label>
+                        </div>
+                        <div class="column is-4">
+                            <label class="checkbox">
+                                <input type="checkbox" class="option" value="OPT_AVOID_SIMILAR">
+                                Исключить похожие символы
+                            </label>
+                        </div>
+                        <div class="column is-4">
+                            <label class="checkbox">
+                                <input type="checkbox" class="option" value="OPT_SEPARATORS">
+                                Добавить разделители
+                            </label>
+                        </div>
+                        <div class="column is-4">
+                            <label class="checkbox">
+                                <input type="checkbox" class="option" value="OPT_NO_REPEAT">
+                                Без повторяющихся символов
+                            </label>
+                        </div>
+                    </div>
+                </div>
 
-            const length = parseInt(document.getElementById('length').value) || 12;
+                <div class="field">
+                    <button class="button is-primary is-fullwidth" onclick="generatePassword()">
+                        Сгенерировать пароль
+                    </button>
+                </div>
 
-            const response = await fetch(API_URLS.GENERATE, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    length,
-                    options: Object.keys(optionsMap).filter(key => (options & optionsMap[key]) !== 0)
-                })
-            });
-
-            if (!response.ok) throw new Error('Ошибка генерации');
-            
-            const data = await response.json();
-            document.getElementById('generated-password').value = data.password;
-            showNotification('Пароль успешно сгенерирован!', 'is-success');
-
-        } catch (error) {
-            showNotification(error.message, 'is-danger');
-        }
-    }
-
-    // Проверка пароля
-    async function checkPassword() {
-        try {
-            const password = document.getElementById('check-password').value;
-            if (!password) return;
-
-            const response = await fetch(API_URLS.CHECK, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ password })
-            });
-
-            if (!response.ok) throw new Error('Ошибка проверки');
-            
-            const result = await response.json();
-            displayCheckResult(result);
-
-        } catch (error) {
-            showNotification(error.message, 'is-danger');
-        }
-    }
-
-    // Отображение результатов проверки
-    function displayCheckResult(result) {
-        const resultDiv = document.getElementById('result');
-        resultDiv.innerHTML = `
-            <div class="notification ${getStrengthClass(result.strength)}">
-                <h4 class="title is-5">Результат проверки</h4>
-                <p><strong>Уровень сложности:</strong> ${result.strength}</p>
-                <p><strong>Энтропия:</strong> ${result.entropy} бит</p>
-                <p><strong>Время взлома:</strong> ${formatTime(result.time_to_crack)}</p>
-                <p><strong>Утечка данных:</strong> ${result.compromised ? '⚠️ Обнаружена' : '✅ Не обнаружена'}</p>
-                
-                ${result.warnings.length ? `
-                <div class="mt-3">
-                    <p class="has-text-weight-bold">Предупреждения:</p>
-                    <ul>${result.warnings.map(w => `<li>• ${w}</li>`).join('')}</ul>
-                </div>` : ''}
-                
-                <div class="mt-3">
-                    <p class="has-text-weight-bold">Рекомендация:</p>
-                    <p>${result.recommendation}</p>
+                <div class="password-field field has-addons">
+                    <div class="control is-expanded">
+                        <input class="input generated-password" type="text" readonly id="generated-password">
+                    </div>
+                    <div class="control">
+                        <button class="button is-info" onclick="copyPassword()">
+                            <span class="icon"><i class="fas fa-copy"></i></span>
+                        </button>
+                    </div>
                 </div>
             </div>
-        `;
-    }
 
-    // Вспомогательные функции
-    function getStrengthClass(strength) {
-        const classes = {
-            'Слабый': 'is-danger',
-            'Средний': 'is-warning',
-            'Надежный': 'is-success',
-            'Очень надежный': 'is-primary',
-            'Ультра надежный': 'is-info'
+            <!-- Проверка пароля -->
+            <div class="box">
+                <h2 class="title is-4">🛡️ Проверка пароля</h2>
+                <div class="password-field field">
+                    <div class="control is-expanded">
+                        <input class="input" type="password" id="check-password" placeholder="Введите пароль для проверки">
+                        <span class="toggle-password" onclick="togglePasswordVisibility()">
+                            <i class="fas fa-eye"></i>
+                        </span>
+                    </div>
+                </div>
+                <button class="button is-info is-fullwidth" onclick="checkPassword()">Проверить пароль</button>
+                
+                <div id="result" class="mt-4">
+                    <!-- Результаты проверки будут здесь -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="content has-text-centered">
+            <h3 class="title is-5">🔍 О технологии</h3>
+            <div class="columns">
+                <div class="column">
+                    <p class="has-text-weight-bold">Энтропия пароля</p>
+                    <p>Мера неопределённости, вычисляемая как log₂(Nᴸ), где:
+                        <br>N - размер набора символов
+                        <br>L - длина пароля
+                    </p>
+                </div>
+                <div class="column">
+                    <p class="has-text-weight-bold">Используемые алгоритмы</p>
+                    <ul>
+                        <li>Генерация через secrets API</li>
+                        <li>Проверка утечек через PwnedPasswords</li>
+                        <li>Анализ паттернов и распределения</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const API_URLS = {
+            GENERATE: '/generate',
+            CHECK: '/check'
         };
-        return classes[strength] || '';
-    }
 
-    function formatTime(seconds) {
-        if (seconds < 1) return 'мгновенно';
-        const units = [
-            {name: 'лет', div: 31536000},
-            {name: 'месяцев', div: 2592000},
-            {name: 'дней', div: 86400},
-            {name: 'часов', div: 3600},
-            {name: 'минут', div: 60}
-        ];
-        
-        for (const unit of units) {
-            if (seconds >= unit.div) {
-                return `${Math.floor(seconds/unit.div)} ${unit.name}`;
+        const optionsMap = {
+            'OPT_LOWERCASE': 1 << 0,
+            'OPT_UPPERCASE': 1 << 1,
+            'OPT_DIGITS': 1 << 2,
+            'OPT_SPECIAL': 1 << 3,
+            'OPT_NO_DIGITS': 1 << 4,
+            'OPT_SEPARATORS': 1 << 5,
+            'OPT_FULLASCII': 1 << 6,
+            'OPT_AVOID_SIMILAR': 1 << 7,
+            'OPT_NO_REPEAT': 1 << 8,
+            'OPT_RANDOM_CASE': 1 << 9,
+            'OPT_CUSTOM_CHARSET': 1 << 10,
+            'OPT_LANGUAGE_SPECIFIC': 1 << 11,
+            'OPT_OUTPUT_FORMAT': 1 << 12
+        };
+
+        async function generatePassword() {
+            try {
+                const options = Array.from(document.querySelectorAll('.option:checked'))
+                    .map(checkbox => checkbox.value)
+                    .reduce((acc, val) => acc | optionsMap[val], 0);
+
+                const length = parseInt(document.getElementById('length').value) || 12;
+
+                const response = await fetch(API_URLS.GENERATE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ length, options: Object.keys(optionsMap).filter(key => (options & optionsMap[key]) !== 0) })
+                });
+
+                if (!response.ok) throw new Error('Ошибка генерации');
+                
+                const data = await response.json();
+                document.getElementById('generated-password').value = data.password;
+                showNotification('Пароль успешно сгенерирован!', 'is-success');
+
+            } catch (error) {
+                showNotification(error.message, 'is-danger');
             }
         }
-        return `${Math.round(seconds)} секунд`;
-    }
 
-    function showNotification(text, type = 'is-info') {
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        notification.textContent = text;
-        
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 3000);
-    }
-</script>
+        async function checkPassword() {
+            try {
+                const password = document.getElementById('check-password').value;
+                if (!password) return;
 
-<!-- Добавьте в секцию опций генератора -->
-<div class="columns is-multiline">
-    <div class="column is-4">
-        <label class="checkbox">
-            <input type="checkbox" class="option" value="OPT_LOWERCASE" checked>
-            Строчные буквы (a-z)
-        </label>
-    </div>
-    <div class="column is-4">
-        <label class="checkbox">
-            <input type="checkbox" class="option" value="OPT_UPPERCASE">
-            Заглавные буквы (A-Z)
-        </label>
-    </div>
-    <div class="column is-4">
-        <label class="checkbox">
-            <input type="checkbox" class="option" value="OPT_DIGITS" checked>
-            Цифры (0-9)
-        </label>
-    </div>
-    <div class="column is-4">
-        <label class="checkbox">
-            <input type="checkbox" class="option" value="OPT_SPECIAL">
-            Спецсимволы (!@#...)
-        </label>
-    </div>
-    <div class="column is-4">
-        <label class="checkbox">
-            <input type="checkbox" class="option" value="OPT_NO_DIGITS">
-            Исключить цифры
-        </label>
-    </div>
-    <div class="column is-4">
-        <label class="checkbox">
-            <input type="checkbox" class="option" value="OPT_AVOID_SIMILAR">
-            Исключить похожие символы
-        </label>
-    </div>
-    <div class="column is-4">
-        <label class="checkbox">
-            <input type="checkbox" class="option" value="OPT_SEPARATORS">
-            Добавить разделители
-        </label>
-    </div>
-    <div class="column is-4">
-        <label class="checkbox">
-            <input type="checkbox" class="option" value="OPT_NO_REPEAT">
-            Без повторяющихся символов
-        </label>
-    </div>
-</div>
+                const response = await fetch(API_URLS.CHECK, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                if (!response.ok) throw new Error('Ошибка проверки');
+                
+                const result = await response.json();
+                displayCheckResult(result);
+
+            } catch (error) {
+                showNotification(error.message, 'is-danger');
+            }
+        }
+
+        function displayCheckResult(result) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <div class="notification ${getStrengthClass(result.strength)}">
+                    <h4 class="title is-5">Результат проверки</h4>
+                    <p><strong>Уровень сложности:</strong> ${result.strength}</p>
+                    <p><strong>Энтропия:</strong> ${result.entropy} бит</p>
+                    <p><strong>Время взлома:</strong> ${formatTime(result.time_to_crack)}</p>
+                    <p><strong>Утечка данных:</strong> ${result.compromised ? '⚠️ Обнаружена' : '✅ Не обнаружена'}</p>
+                    
+                    ${result.warnings.length ? `
+                    <div class="mt-3">
+                        <p class="has-text-weight-bold">Предупреждения:</p>
+                        <ul>${result.warnings.map(w => `<li>• ${w}</li>`).join('')}</ul>
+                    </div>` : ''}
+                    
+                    <div class="mt-3">
+                        <p class="has-text-weight-bold">Рекомендация:</p>
+                        <p>${result.recommendation}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function copyPassword() {
+            const passField = document.getElementById('generated-password');
+            navigator.clipboard.writeText(passField.value).then(() => {
+                showNotification('Пароль скопирован!', 'is-success');
+            });
+        }
+
+        function togglePasswordVisibility() {
+            const passField = document.getElementById('check-password');
+            const icon = document.querySelector('.toggle-password i');
+            passField.type = passField.type === 'password' ? 'text' : 'password';
+            icon.classList.toggle('fa-eye-slash');
+        }
+
+        function getStrengthClass(strength) {
+            const classes = {
+                'Слабый': 'is-danger',
+                'Средний': 'is-warning',
+                'Надежный': 'is-success',
+                'Очень надежный': 'is-primary',
+                'Ультра надежный': 'is-info'
+            };
+            return classes[strength] || '';
+        }
+
+        function formatTime(seconds) {
+            if (seconds < 1) return 'мгновенно';
+            const units = [
+                {name: 'лет', div: 31536000},
+                {name: 'месяцев', div: 2592000},
+                {name: 'дней', div: 86400},
+                {name: 'часов', div: 3600},
+                {name: 'минут', div: 60}
+            ];
+            
+            for (const unit of units) {
+                if (seconds >= unit.div) {
+                    return `${Math.floor(seconds/unit.div)} ${unit.name}`;
+                }
+            }
+            return `${Math.round(seconds)} секунд`;
+        }
+
+        function showNotification(text, type = 'is-info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = text;
+            
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        }
+    </script>
+</body>
+</html>
