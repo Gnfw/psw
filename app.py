@@ -33,7 +33,7 @@ class PasswordOptions(IntFlag):
 
 DICTIONARY_URLS = {
     'english': 'https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt',
-    'russian': 'https://raw.githubusercontent.com/Harrix/rus-wordlist/main/wordlist.txt'
+    'russian': 'https://raw.githubusercontent.com/LinguaLeo/russian-nouns/master/src/russian_nouns.txt'
 }
 
 DICTIONARY = set()
@@ -90,7 +90,9 @@ def has_sequential_chars(password: str, min_seq: int = 3) -> bool:
 def is_dictionary_word(password: str) -> bool:
     if not DICTIONARY:
         return False
-    words = re.findall(r'[a-zA-Zа-яА-Я]+', password.lower())
+    
+    # Ищем только полные слова длиной от 4 символов
+    words = re.findall(r'\b[a-zа-яё]{4,}\b', password.lower())
     return any(word in DICTIONARY for word in words)
 
 def check_password_strength(password: str) -> Tuple[int, float, float, List[str]]:
