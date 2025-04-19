@@ -6,7 +6,7 @@ import requests
 import hashlib
 import re
 from enum import IntFlag
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 from collections import Counter
 import logging
 
@@ -30,10 +30,11 @@ class PasswordOptions(IntFlag):
     OPT_OUTPUT_FORMAT = 1 << 12
     OPT_NO_REPEAT_CHARS = 1 << 13
     OPT_UNICODE = 1 << 14
+    OPT_MNEMONIC = 1 << 15
 
 DICTIONARY_URLS = {
     'english': 'https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt',
-    'russian': 'https://raw.githubusercontent.com/danakt/russian-words/master/russian.txt'
+    'russian': 'https://raw.githubusercontent.com/textlint-ja/textlint-dict-russian/main/dict/russian.txt'
 }
 
 DICTIONARY = set()
@@ -53,6 +54,24 @@ try:
     logger.info(f"Загружено слов из словарей: {len(DICTIONARY)}")
 except Exception as e:
     logger.error(f"Не удалось загрузить словари: {e}")
+
+def generate_mnemonic_phrase(word_count: int = 4, separator: str = "-", min_word_length: int = 5) -> str:
+    words = [w for w in DICTIONARY if len(w) >= min_word_length]
+    if not words:
+        raise ValueError("Словарь не содержит подходящих слов")
+    
+    selected = secrets.SystemRandom().sample(words, word_count)
+    return separator.join(selected).title()
+
+def is_dictionary_word(password: str) -> bool:
+    if not DICTIONARY:
+        return False
+    
+    words = re.findall(r'[a-zа-яё]{4,}', password.lower())
+    cleaned_password = re.sub(r'\d+', ' ', password.lower())
+    parts = [word for word in cleaned_password.split() if len(word) >= 4]
+    
+    return any(word in DICTIONARY for word in words + parts)
 
 def get_cryptographically_random_bytes(num_bytes: int) -> bytes:
     return secrets.token_bytes(num_bytes)
@@ -87,22 +106,35 @@ def has_sequential_chars(password: str, min_seq: int = 3) -> bool:
     return any(seq[i:i+min_seq] in password_lower or seq[i:i+min_seq][::-1] in password_lower
                for seq in sequences for i in range(len(seq) - min_seq + 1))
 
-def is_dictionary_word(password: str) -> bool:
-    if not DICTIONARY:
-        return False
-    
- # Ищем все буквенные последовательности от 4 символов
-    words = re.findall(r'[a-zа-яё]{4,}', password.lower())
-  # Удаляем числа и проверяем оставшиеся части
-    cleaned_password = re.sub(r'\d+', ' ', password.lower())
-    parts = [word for word in cleaned_password.split() if len(word) >= 4]
-    
-    # Проверяем все возможные варианты
-    return any(word in DICTIONARY for word in words + parts)
+def has_repeated_patterns(password: str, min_pattern_length: int = 2) -> bool:
+    return any(password[i:i+min_pattern_length] in password[i+min_pattern_length:] 
+              for i in range(len(password) - min_pattern_length * 2 + 1))
 
-def check_password_strength(password: str) -> Tuple[int, float, float, List[str]]:
+def has_dates(password: str) -> bool:
+    return any(re.search(p, password) for p in [
+        r'\d{1,2}[./-]\d{1,2}[./-]\d{2,4}', r'\d{4}', r'(19|20)\d{2}'
+    ])
+
+def has_uniform_distribution(password: str, threshold: float = 0.5) -> bool:
+    counts = Counter(password)
+    return max(counts.values()) / len(password) > threshold
+
+def calculate_entropy(password: str, char_set_size: int) -> Tuple[float, float]:
+    standard_entropy = len(password) * math.log2(char_set_size) if char_set_size > 0 else 0
+    freq = Counter(password)
+    probs = [count/len(password) for count in freq.values()]
+    shannon_entropy = -sum(p * math.log2(p) for p in probs) if probs else 0
+    return standard_entropy, shannon_entropy
+
+def check_password_strength(password: str, forbidden_context: List[str] = None) -> Dict:
     warnings = []
+    forbidden_context = forbidden_context or []
     
+    if forbidden_context:
+        context_pattern = re.compile('|'.join(map(re.escape, forbidden_context)), re.I)
+        if context_pattern.search(password):
+            warnings.append("Пароль содержит контекстно-зависимые данные")
+
     if len(password) < 8:
         warnings.append("Пароль слишком короткий (минимум 8 символов)")
     
@@ -121,10 +153,11 @@ def check_password_strength(password: str) -> Tuple[int, float, float, List[str]
         10 if has_digit else 0,
         len(special_chars) if has_special else 0
     ]) or 1
-    
-    entropy = len(password) * math.log2(char_set_size)
-    time_to_crack = (2 ** entropy) / 1e10
-    
+
+    standard_entropy, shannon_entropy = calculate_entropy(password, char_set_size)
+    min_entropy = min(standard_entropy, shannon_entropy)
+    time_to_crack = (2 ** min_entropy) / 1e10
+
     score = sum([has_lower, has_upper, has_digit, has_special]) + min(3, len(password) // 8)
     
     checks = [
@@ -143,20 +176,16 @@ def check_password_strength(password: str) -> Tuple[int, float, float, List[str]
             score -= 1
     
     strength = min(max(math.ceil(score / 2), 1), 5)
-    return strength, entropy, time_to_crack, warnings
-
-def has_repeated_patterns(password: str, min_pattern_length: int = 2) -> bool:
-    return any(password[i:i+min_pattern_length] in password[i+min_pattern_length:] 
-              for i in range(len(password) - min_pattern_length * 2 + 1))
-
-def has_dates(password: str) -> bool:
-    return any(re.search(p, password) for p in [
-        r'\d{1,2}[./-]\d{1,2}[./-]\d{2,4}', r'\d{4}', r'(19|20)\d{2}'
-    ])
-
-def has_uniform_distribution(password: str, threshold: float = 0.5) -> bool:
-    counts = Counter(password)
-    return max(counts.values()) / len(password) > threshold
+    return {
+        'strength': strength,
+        'entropy': {
+            'standard': standard_entropy,
+            'shannon': shannon_entropy,
+            'combined': min_entropy
+        },
+        'time_to_crack': time_to_crack,
+        'warnings': warnings
+    }
 
 def is_password_pwned(password: str) -> bool:
     try:
@@ -175,6 +204,16 @@ def generate_password_with_options(
     custom_charset: str = "",
     language_charset: str = ""
 ) -> str:
+    if options & PasswordOptions.OPT_MNEMONIC:
+        if length < 12:
+            logger.warning("Рекомендуемая длина для мнемоники - от 12 символов")
+        phrase = generate_mnemonic_phrase(
+            word_count=max(3, length // 6),
+            separator=separator,
+            min_word_length=5
+        )
+        return phrase[:length]
+    
     charset = ""
     
     if options & PasswordOptions.OPT_CUSTOM_CHARSET:
@@ -192,10 +231,14 @@ def generate_password_with_options(
     elif options & PasswordOptions.OPT_FULLASCII:
         charset = string.printable[:94]
     else:
-        charset += string.ascii_lowercase if options & PasswordOptions.OPT_LOWERCASE else ""
-        charset += string.ascii_uppercase if options & PasswordOptions.OPT_UPPERCASE else ""
-        charset += string.digits if options & PasswordOptions.OPT_DIGITS else ""
-        charset += "!@#$%^&*()_+~`|}{[]\\:;\"'<>?,./-=" if options & PasswordOptions.OPT_SPECIAL else ""
+        if options & PasswordOptions.OPT_LOWERCASE:
+            charset += string.ascii_lowercase
+        if options & PasswordOptions.OPT_UPPERCASE:
+            charset += string.ascii_uppercase
+        if options & PasswordOptions.OPT_DIGITS:
+            charset += string.digits
+        if options & PasswordOptions.OPT_SPECIAL:
+            charset += "!@#$%^&*()_+~`|}{[]\\:;\"'<>?,./-="
         
         if options & PasswordOptions.OPT_NO_DIGITS:
             charset = ''.join(c for c in charset if not c.isdigit())
@@ -249,15 +292,19 @@ def generate_password():
         )
         
         pwned = is_password_pwned(password)
-        strength, entropy, time_to_crack, warnings = check_password_strength(password)
+        result = check_password_strength(password, data.get('forbidden_context', []))
         
         return jsonify({
             "password": password,
-            "strength": strength,
+            "strength": result['strength'],
             "compromised": pwned,
-            "warnings": warnings,
-            "entropy": entropy,
-            "time_to_crack": time_to_crack
+            "warnings": result['warnings'],
+            "entropy": {
+                "standard": round(result['entropy']['standard'], 2),
+                "shannon": round(result['entropy']['shannon'], 2),
+                "combined": round(result['entropy']['combined'], 2)
+            },
+            "time_to_crack": round(result['time_to_crack'], 2)
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -270,7 +317,7 @@ def check_password():
             return jsonify({"error": "Не указан пароль"}), 400
         
         password = data['password']
-        strength, entropy, time_to_crack, warnings = check_password_strength(password)
+        result = check_password_strength(password, data.get('forbidden_context', []))
         pwned = is_password_pwned(password)
         
         strength_labels = {
@@ -282,13 +329,17 @@ def check_password():
         }
         
         return jsonify({
-            "strength": strength_labels.get(strength, "Неизвестный"),
-            "entropy": round(entropy, 2),
-            "time_to_crack": round(time_to_crack, 2),
+            "strength": strength_labels.get(result['strength'], "Неизвестный"),
+            "entropy": {
+                "standard": round(result['entropy']['standard'], 2),
+                "shannon": round(result['entropy']['shannon'], 2),
+                "combined": round(result['entropy']['combined'], 2)
+            },
+            "time_to_crack": round(result['time_to_crack'], 2),
             "compromised": pwned,
-            "warnings": warnings,
+            "warnings": result['warnings'],
             "recommendation": "Срочно измените пароль!" if pwned else 
-                            "Используйте более сложный пароль" if strength < 3 else 
+                            "Используйте более сложный пароль" if result['strength'] < 3 else 
                             "Пароль соответствует стандартам безопасности"
         })
     except Exception as e:
