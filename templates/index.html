@@ -149,6 +149,35 @@
             font-weight: bold;
             margin: 10px 0;
         }
+        .context-input {
+            margin: 15px 0;
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .entropy-details {
+            margin: 10px 0;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+        .entropy-details table {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .entropy-details td {
+            padding: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+        .mnemonic-warning {
+            color: #856404;
+            background-color: #fff3cd;
+            border-color: #ffeeba;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -174,6 +203,7 @@
             
             <h3>Настройки:</h3>
             <div class="options-grid">
+                <label><input type="checkbox" name="option" value="OPT_MNEMONIC"> Мнемоническая фраза</label>
                 <label><input type="checkbox" name="option" value="OPT_LOWERCASE"> Строчные буквы</label>
                 <label><input type="checkbox" name="option" value="OPT_UPPERCASE"> Прописные буквы</label>
                 <label><input type="checkbox" name="option" value="OPT_DIGITS"> Цифры</label>
@@ -182,6 +212,11 @@
                 <label><input type="checkbox" name="option" value="OPT_AVOID_SIMILAR"> Исключить похожие</label>
                 <label><input type="checkbox" name="option" value="OPT_NO_REPEAT_CHARS"> Без повторений</label>
                 <label><input type="checkbox" name="option" value="OPT_UNICODE"> Юникод-символы</label>
+            </div>
+
+            <div>
+                <input type="text" class="context-input" id="forbiddenContext" 
+                       placeholder="Запрещенные слова (через запятую)">
             </div>
             
             <button onclick="generatePassword()" style="padding: 12px 25px;">
@@ -199,6 +234,12 @@
                        style="padding: 10px; width: 300px;">
                 <span class="toggle-password" onclick="togglePasswordVisibility()">👁️</span>
             </div>
+            
+            <div>
+                <input type="text" class="context-input" id="checkForbiddenContext" 
+                       placeholder="Запрещенные слова (через запятую)">
+            </div>
+
             <button onclick="checkPassword()" style="margin-top: 15px;">
                 <span id="checkText">Проверить безопасность</span>
                 <span id="checkLoader" class="loading" style="display: none;"></span>
@@ -235,12 +276,22 @@
         }
 
         function formatTime(seconds) {
-            if(seconds < 3600) return "<1 часа";
-            if(seconds < 86400) return `${Math.round(seconds/3600)} часов`;
-            const days = Math.round(seconds/86400);
-            return days > 365 ? 
-                `${Math.round(days/365)} лет` : 
-                `${days} дней`;
+            const units = [
+                {name: 'лет', value: 31536000},
+                {name: 'дней', value: 86400},
+                {name: 'часов', value: 3600},
+            ];
+            
+            let result = [];
+            for (const unit of units) {
+                if (seconds >= unit.value) {
+                    const count = Math.floor(seconds / unit.value);
+                    result.push(`${count} ${unit.name}`);
+                    seconds %= unit.value;
+                }
+            }
+            
+            return result.length > 0 ? result.join(' ') : 'менее часа';
         }
 
         async function generatePassword() {
@@ -261,6 +312,11 @@
                 const options = Array.from(document.querySelectorAll('input[name="option"]:checked'))
                     .map(el => el.value);
 
+                const forbiddenContext = document.getElementById('forbiddenContext').value
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(Boolean);
+
                 if(useCustomCharset) {
                     options.push('OPT_CUSTOM_CHARSET');
                     const customChars = document.getElementById('customCharset').value;
@@ -276,7 +332,8 @@
                         length,
                         options,
                         separator: '-',
-                        custom_charset: document.getElementById('customCharset').value
+                        custom_charset: document.getElementById('customCharset').value,
+                        forbidden_context: forbiddenContext
                     })
                 });
                 
@@ -304,10 +361,26 @@
                         `;
                     }
 
+                    const entropyHTML = `
+                        <div class="entropy-details">
+                            <table>
+                                <tr><td>Стандартная энтропия:</td><td>${data.entropy.standard.toFixed(2)} бит</td></tr>
+                                <tr><td>Энтропия Шеннона:</td><td>${data.entropy.shannon.toFixed(2)} бит</td></tr>
+                                <tr><td>Комбинированная оценка:</td><td>${data.entropy.combined.toFixed(2)} бит</td></tr>
+                            </table>
+                            Примерное время взлома: ~${formatTime(data.time_to_crack)}
+                        </div>
+                    `;
+
+                    const mnemonicWarning = options.includes('OPT_MNEMONIC') && length < 12 ? 
+                        `<div class="mnemonic-warning">⚠️ Для мнемонических фраз рекомендуется длина от 12 символов</div>` : '';
+
                     resultDiv.innerHTML = `
+                        ${mnemonicWarning}
                         <div class="status-item ${strengthClass}">
                             <strong>Пароль:</strong> <span id="generatedPassword">${data.password}</span>
                             <button class="copy-btn" onclick="copyPassword()">Копировать</button>
+                            ${entropyHTML}
                             <div style="margin-top: 10px;">
                                 Уровень безопасности: ${strengthText}<br>
                                 ${data.compromised ? 
@@ -369,10 +442,18 @@
             }
 
             try {
+                const forbiddenContext = document.getElementById('checkForbiddenContext').value
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(Boolean);
+
                 const response = await fetch('/check', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ password })
+                    body: JSON.stringify({ 
+                        password,
+                        forbidden_context: forbiddenContext
+                    })
                 });
                 
                 const data = await response.json();
@@ -394,10 +475,20 @@
                         `;
                     }
 
+                    const entropyHTML = `
+                        <div class="entropy-details">
+                            <table>
+                                <tr><td>Стандартная энтропия:</td><td>${data.entropy.standard.toFixed(2)} бит</td></tr>
+                                <tr><td>Энтропия Шеннона:</td><td>${data.entropy.shannon.toFixed(2)} бит</td></tr>
+                                <tr><td>Комбинированная оценка:</td><td>${data.entropy.combined.toFixed(2)} бит</td></tr>
+                            </table>
+                        </div>
+                    `;
+
                     resultDiv.innerHTML = `
                         <div class="status-item ${strengthClass}">
+                            ${entropyHTML}
                             <div>🔐 Уровень безопасности: <strong>${data.strength}</strong></div>
-                            <div>📊 Энтропия: ${data.entropy} бит</div>
                             <div>⏱ Примерное время взлома: ~${formatTime(data.time_to_crack)}</div>
                             <div>${data.compromised ? 
                                 '⚠️ ВНИМАНИЕ! Пароль найден в утечках данных!' : 
