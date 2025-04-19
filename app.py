@@ -6,7 +6,7 @@ import requests
 import hashlib
 import re
 from enum import IntFlag
-from typing import Dict, List, Set
+from typing import Tuple, List, Dict, Set  # Добавлены недостающие импорты
 from collections import Counter
 import logging
 
