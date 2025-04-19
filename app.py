@@ -33,7 +33,7 @@ class PasswordOptions(IntFlag):
     OPT_MNEMONIC = 1 << 15
 
 DICTIONARY_URLS = {
-    'english': 'https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa.txt',
+    'english': 'https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt',
     'russian': 'https://raw.githubusercontent.com/Harrix/Russian-Nouns/main/dist/russian_nouns.txt'
 }
 
@@ -44,13 +44,18 @@ def load_online_dictionary(url: str) -> Set[str]:
         response = requests.get(url, timeout=15)
         response.raise_for_status()
         
-        if 'russian' in url:
-            words = [word.strip().lower() for word in response.text.splitlines() 
-                    if word.strip() and len(word.strip()) >= 4]
-        else:
-            words = [word.strip().lower() for word in response.text.splitlines() 
-                    if word.strip()]
-            
+        # Фильтрация слов
+        min_length = 4  # Минимальная длина слова
+        max_length = 10 # Максимальная длина слова
+       
+      words = [
+            word.strip().lower() 
+            for word in response.text.splitlines() 
+            if word.strip() 
+            and min_length <= len(word.strip()) <= max_length
+            and word.isalpha()
+        ]
+        
         return set(words)
     except Exception as e:
         logger.error(f"Ошибка загрузки словаря: {e}")
