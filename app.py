@@ -6,7 +6,7 @@ import requests
 import hashlib
 import re
 from enum import IntFlag
-from typing import Tuple, List, Dict
+from typing import Dict, List, Set
 from collections import Counter
 import logging
 
@@ -33,34 +33,52 @@ class PasswordOptions(IntFlag):
     OPT_MNEMONIC = 1 << 15
 
 DICTIONARY_URLS = {
-    'english': 'https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt',
-    'russian': 'https://raw.githubusercontent.com/textlint-ja/textlint-dict-russian/main/dict/russian.txt'
+    'english': 'https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa.txt',
+    'russian': 'https://raw.githubusercontent.com/Harrix/Russian-Nouns/main/dist/russian_nouns.txt'
 }
 
-DICTIONARY = set()
+DICTIONARY: Set[str] = set()
 
-def load_online_dictionary(url: str) -> set:
+def load_online_dictionary(url: str) -> Set[str]:
     try:
         response = requests.get(url, timeout=15)
         response.raise_for_status()
-        return set(word.strip().lower() for word in response.text.splitlines() if word.strip())
+        
+        if 'russian' in url:
+            words = [word.strip().lower() for word in response.text.splitlines() 
+                    if word.strip() and len(word.strip()) >= 4]
+        else:
+            words = [word.strip().lower() for word in response.text.splitlines() 
+                    if word.strip()]
+            
+        return set(words)
     except Exception as e:
         logger.error(f"Ошибка загрузки словаря: {e}")
         return set()
 
 try:
-    DICTIONARY.update(load_online_dictionary(DICTIONARY_URLS['english']))
-    DICTIONARY.update(load_online_dictionary(DICTIONARY_URLS['russian']))
-    logger.info(f"Загружено слов из словарей: {len(DICTIONARY)}")
+    eng_words = load_online_dictionary(DICTIONARY_URLS['english'])
+    rus_words = load_online_dictionary(DICTIONARY_URLS['russian'])
+    
+    DICTIONARY.update(eng_words)
+    DICTIONARY.update(rus_words)
+    
+    logger.info(f"Загружено слов: EN {len(eng_words)}, RU {len(rus_words)}")
+    if not DICTIONARY:
+        raise ValueError("Словари не загружены")
+        
 except Exception as e:
     logger.error(f"Не удалось загрузить словари: {e}")
+    DICTIONARY.update({'password', 'sun', 'moon', 'пароль', 'солнце', 'apple', 'banana', 'security'})
+    logger.warning("Используется резервный словарь")
 
-def generate_mnemonic_phrase(word_count: int = 4, separator: str = "-", min_word_length: int = 5) -> str:
-    words = [w for w in DICTIONARY if len(w) >= min_word_length]
+def generate_mnemonic_phrase(word_count: int = 4, separator: str = "-", min_word_length: int = 6) -> str:
+    words = [w for w in DICTIONARY if len(w) >= min_word_length and w.isalpha()]
     if not words:
         raise ValueError("Словарь не содержит подходящих слов")
     
-    selected = secrets.SystemRandom().sample(words, word_count)
+    rng = secrets.SystemRandom()
+    selected = [rng.choice(words) for _ in range(word_count)]
     return separator.join(selected).title()
 
 def is_dictionary_word(password: str) -> bool:
@@ -120,10 +138,17 @@ def has_uniform_distribution(password: str, threshold: float = 0.5) -> bool:
     return max(counts.values()) / len(password) > threshold
 
 def calculate_entropy(password: str, char_set_size: int) -> Tuple[float, float]:
+    if len(password) == 0:
+        return 0.0, 0.0
+    
+    # Standard entropy
     standard_entropy = len(password) * math.log2(char_set_size) if char_set_size > 0 else 0
+    
+    # Shannon entropy
     freq = Counter(password)
     probs = [count/len(password) for count in freq.values()]
-    shannon_entropy = -sum(p * math.log2(p) for p in probs) if probs else 0
+    shannon_entropy = -sum(p * math.log2(p) for p in probs) * len(password) if probs else 0
+    
     return standard_entropy, shannon_entropy
 
 def check_password_strength(password: str, forbidden_context: List[str] = None) -> Dict:
@@ -155,8 +180,8 @@ def check_password_strength(password: str, forbidden_context: List[str] = None) 
     ]) or 1
 
     standard_entropy, shannon_entropy = calculate_entropy(password, char_set_size)
-    min_entropy = min(standard_entropy, shannon_entropy)
-    time_to_crack = (2 ** min_entropy) / 1e10
+    effective_entropy = max(standard_entropy, shannon_entropy)
+    time_to_crack = (2 ** effective_entropy) / 1e10  # 10 млрд попыток/сек
 
     score = sum([has_lower, has_upper, has_digit, has_special]) + min(3, len(password) // 8)
     
@@ -181,7 +206,7 @@ def check_password_strength(password: str, forbidden_context: List[str] = None) 
         'entropy': {
             'standard': standard_entropy,
             'shannon': shannon_entropy,
-            'combined': min_entropy
+            'combined': effective_entropy
         },
         'time_to_crack': time_to_crack,
         'warnings': warnings
@@ -205,12 +230,10 @@ def generate_password_with_options(
     language_charset: str = ""
 ) -> str:
     if options & PasswordOptions.OPT_MNEMONIC:
-        if length < 12:
-            logger.warning("Рекомендуемая длина для мнемоники - от 12 символов")
         phrase = generate_mnemonic_phrase(
             word_count=max(3, length // 6),
             separator=separator,
-            min_word_length=5
+            min_word_length=6
         )
         return phrase[:length]
     
