@@ -178,6 +178,10 @@
             border-radius: 4px;
             margin: 10px 0;
         }
+        .disabled-option {
+            opacity: 0.6;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -203,7 +207,7 @@
             
             <h3>Настройки:</h3>
             <div class="options-grid">
-                <label><input type="checkbox" name="option" value="OPT_MNEMONIC"> Мнемоническая фраза</label>
+                <label><input type="checkbox" name="option" value="OPT_MNEMONIC" onchange="toggleMnemonicOptions()"> Мнемоническая фраза</label>
                 <label><input type="checkbox" name="option" value="OPT_LOWERCASE"> Строчные буквы</label>
                 <label><input type="checkbox" name="option" value="OPT_UPPERCASE"> Прописные буквы</label>
                 <label><input type="checkbox" name="option" value="OPT_DIGITS"> Цифры</label>
@@ -250,7 +254,26 @@
 
     <script>
         let useCustomCharset = false;
-        
+
+        function toggleMnemonicOptions() {
+            const isMnemonic = document.querySelector('input[name="option"][value="OPT_MNEMONIC"]').checked;
+            const options = document.querySelectorAll('input[name="option"]:not([value="OPT_MNEMONIC"])');
+            const forbiddenContext = document.getElementById('forbiddenContext');
+            const customCharset = document.getElementById('customCharset');
+            
+            options.forEach(opt => {
+                opt.disabled = isMnemonic;
+                if(isMnemonic) opt.checked = false;
+            });
+            
+            forbiddenContext.disabled = isMnemonic;
+            customCharset.disabled = isMnemonic;
+            if(isMnemonic) {
+                customCharset.value = '';
+                useCustomCharset = false;
+            }
+        }
+
         function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
             toast.textContent = message;
@@ -276,22 +299,21 @@
         }
 
         function formatTime(seconds) {
+            if (seconds < 1) return "мгновенно";
             const units = [
-                {name: 'лет', value: 31536000},
-                {name: 'дней', value: 86400},
-                {name: 'часов', value: 3600},
+                { name: 'веков', value: 3.154e9 },
+                { name: 'лет', value: 3.154e7 },
+                { name: 'дней', value: 86400 },
+                { name: 'часов', value: 3600 },
             ];
             
-            let result = [];
             for (const unit of units) {
                 if (seconds >= unit.value) {
                     const count = Math.floor(seconds / unit.value);
-                    result.push(`${count} ${unit.name}`);
-                    seconds %= unit.value;
+                    return `${count} ${unit.name}`;
                 }
             }
-            
-            return result.length > 0 ? result.join(' ') : 'менее часа';
+            return "менее часа";
         }
 
         async function generatePassword() {
