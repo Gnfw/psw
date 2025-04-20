@@ -191,8 +191,7 @@
             <h1>🔍 Проверка Пароля</h1>
             <div class="password-field">
                 <input type="password" id="passwordToCheck" 
-                       placeholder="Введите пароль для проверки"
-                       oninput="debouncedCheck()">
+                       placeholder="Введите пароль для проверки">
                 <span class="toggle-password" onclick="togglePasswordVisibility()">👁️</span>
             </div>
             
@@ -218,32 +217,13 @@
             5: ['Ультра надежный', '#004D1A']
         };
 
-        let timeout;
-        function debouncedCheck() {
-            clearTimeout(timeout);
-            timeout = setTimeout(checkPassword, 500);
-        }
-
         function toggleMnemonicOptions() {
             const isMnemonic = document.querySelector('input[name="option"][value="OPT_MNEMONIC"]').checked;
-            const allowed = ['OPT_DIGITS', 'OPT_SPECIAL', 'OPT_RANDOM_CASE'];
+            const randomCaseCheckbox = document.querySelector('input[name="option"][value="OPT_RANDOM_CASE"]');
             
-            document.querySelectorAll('input[name="option"]').forEach(opt => {
-                if (allowed.includes(opt.value)) {
-                    opt.disabled = !isMnemonic;
-                    if (!isMnemonic) opt.checked = false;
-                } else if (opt.value !== 'OPT_MNEMONIC') {
-                    opt.disabled = isMnemonic;
-                    if (isMnemonic) opt.checked = false;
-                }
-            });
-        }
-
-        function updateStrengthBar(strength) {
-            const bar = document.querySelector('.strength-bar');
-            if (!bar) return;
-            bar.style.width = `${strength * 20}%`;
-            bar.style.background = strengthMap[Math.min(strength, 5)][1];
+            // Блокируем случайный регистр для обычных паролей
+            randomCaseCheckbox.disabled = !isMnemonic;
+            if (!isMnemonic) randomCaseCheckbox.checked = false;
         }
 
         function showToast(message, isError = false) {
@@ -252,6 +232,13 @@
             toast.className = `toast ${isError ? 'error' : ''}`;
             toast.style.display = 'block';
             setTimeout(() => toast.style.display = 'none', 3000);
+        }
+
+        function updateStrengthBar(strength) {
+            const bar = document.querySelector('.strength-bar');
+            if (!bar) return;
+            bar.style.width = `${strength * 20}%`;
+            bar.style.background = strengthMap[Math.min(strength, 5)][1];
         }
 
         function formatTime(seconds) {
@@ -284,7 +271,7 @@
             try {
                 const length = parseInt(document.getElementById('length').value);
                 if (isNaN(length) || length < 12 || length > 100) {
-                    throw new Error('Некорректная длина пароля (12-100)');
+                    throw new Error('Длина пароля должна быть от 12 до 100 символов');
                 }
 
                 const options = Array.from(document.querySelectorAll('input[name="option"]:checked'))
@@ -304,61 +291,62 @@
                         forbidden_context: forbiddenContext
                     })
                 });
-                
+
                 const data = await response.json();
                 
-                if (response.ok) {
-                    const strength = data.strength || 1;
-                    const [strengthText] = strengthMap[strength] || ['Неизвестно'];
-                    updateStrengthBar(strength);
-                    
-                    let warningsHTML = '';
-                    if (data.warnings && data.warnings.length > 0) {
-                        warningsHTML = `
-                            <div class="warnings">
-                                <strong>⚠️ Проблемы:</strong>
-                                <ul class="warning-list">
-                                    ${data.warnings.map(w => `<li>${w}</li>`).join('')}
-                                </ul>
-                            </div>
-                        `;
-                    }
-
-                    const entropyHTML = `
-                        <div class="entropy-details">
-                            <table>
-                                <tr><td>Стандартная энтропия:</td><td>${data.entropy.standard.toFixed(2)} бит</td></tr>
-                                <tr><td>Комбинированная оценка:</td><td>${data.entropy.combined.toFixed(2)} бит</td></tr>
-                            </table>
-                            Примерное время взлома: ~${formatTime(data.time_to_crack)}
-                        </div>
-                    `;
-
-                    resultDiv.innerHTML = `
-                        <div class="status-item">
-                            <strong>Пароль:</strong> <span id="generatedPassword">${data.password}</span>
-                            <button class="copy-btn" onclick="copyPassword()">Копировать</button>
-                            ${entropyHTML}
-                            <div style="margin-top: 10px;">
-                                Уровень безопасности: ${strengthText}<br>
-                                ${data.compromised ? 
-                                    '<div class="compromised-warning">⚠️ ВНИМАНИЕ! Пароль найден в утечках данных!</div>' : 
-                                    '✅ Пароль безопасен (не найден в утечках)'}
-                            </div>
-                            ${warningsHTML}
-                        </div>
-                    `;
-                    showToast('Пароль успешно сгенерирован!');
-                } else {
-                    throw new Error(data.error || 'Неизвестная ошибка сервера');
+                if (!response.ok) {
+                    throw new Error(data.error || 'Ошибка сервера');
                 }
+
+                const strength = data.strength || 1;
+                const [strengthText] = strengthMap[strength] || ['Неизвестно'];
+                updateStrengthBar(strength);
+                
+                let warningsHTML = '';
+                if (data.warnings && data.warnings.length > 0) {
+                    warningsHTML = `
+                        <div class="warnings">
+                            <strong>⚠️ Проблемы:</strong>
+                            <ul class="warning-list">
+                                ${data.warnings.map(w => `<li>${w}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+
+                const entropyHTML = `
+                    <div class="entropy-details">
+                        <table>
+                            <tr><td>Стандартная энтропия:</td><td>${data.entropy.standard.toFixed(2)} бит</td></tr>
+                            <tr><td>Энтропия Шеннона:</td><td>${data.entropy.shannon.toFixed(2)} бит</td></tr>
+                            <tr><td>Комбинированная оценка:</td><td>${data.entropy.combined.toFixed(2)} бит</td></tr>
+                        </table>
+                        Примерное время взлома: ~${formatTime(data.time_to_crack)}
+                    </div>
+                `;
+
+                resultDiv.innerHTML = `
+                    <div class="status-item">
+                        <strong>Пароль:</strong> <span id="generatedPassword">${data.password}</span>
+                        <button class="copy-btn" onclick="copyPassword()">Копировать</button>
+                        ${entropyHTML}
+                        <div style="margin-top: 10px;">
+                            Уровень безопасности: <span style="color: ${strengthMap[strength][1]}">${strengthText}</span><br>
+                            ${data.compromised ? 
+                                '<div class="compromised-warning">⚠️ ВНИМАНИЕ! Пароль найден в утечках данных!</div>' : 
+                                '✅ Пароль безопасен (не найден в утечках)'}
+                        </div>
+                        ${warningsHTML}
+                    </div>
+                `;
+                showToast('Пароль успешно сгенерирован!');
             } catch (error) {
                 resultDiv.innerHTML = `
                     <div class="error">
-                        Ошибка: ${error.message || 'Ошибка соединения'}
+                        Ошибка: ${error.message}
                     </div>
                 `;
-                showToast(error.message || 'Ошибка соединения', true);
+                showToast(error.message, true);
             } finally {
                 generateBtn.style.display = 'inline-block';
                 loader.style.display = 'none';
@@ -391,15 +379,11 @@
             loader.style.display = 'inline-block';
             resultDiv.innerHTML = '<div class="status-item">Проверка...</div>';
 
-            if (!password) {
-                resultDiv.innerHTML = '<div class="error">Введите пароль для проверки</div>';
-                showToast('Введите пароль для проверки', true);
-                checkBtn.style.display = 'inline-block';
-                loader.style.display = 'none';
-                return;
-            }
-
             try {
+                if (!password) {
+                    throw new Error("Введите пароль для проверки");
+                }
+
                 const forbiddenContext = document.getElementById('checkForbiddenContext').value
                     .split(',')
                     .map(s => s.trim())
@@ -413,56 +397,57 @@
                         forbidden_context: forbiddenContext
                     })
                 });
-                
+
                 const data = await response.json();
                 
-                if (response.ok) {
-                    const strength = data.strength || 1;
-                    const [strengthText, color] = strengthMap[strength] || ['Неизвестно', '#ddd'];
-                    
-                    let warningsHTML = '';
-                    if (data.warnings && data.warnings.length > 0) {
-                        warningsHTML = `
-                            <div class="warnings">
-                                <strong>⚠️ Проблемы:</strong>
-                                <ul class="warning-list">
-                                    ${data.warnings.map(w => `<li>${w}</li>`).join('')}
-                                </ul>
-                            </div>
-                        `;
-                    }
-
-                    const entropyHTML = `
-                        <div class="entropy-details">
-                            <table>
-                                <tr><td>Стандартная энтропия:</td><td>${data.entropy.standard.toFixed(2)} бит</td></tr>
-                                <tr><td>Комбинированная оценка:</td><td>${data.entropy.combined.toFixed(2)} бит</td></tr>
-                            </table>
-                        </div>
-                    `;
-
-                    resultDiv.innerHTML = `
-                        <div class="status-item" style="border-left: 5px solid ${color}">
-                            ${entropyHTML}
-                            <div>🔐 Уровень безопасности: <strong>${strengthText}</strong></div>
-                            <div>⏱ Примерное время взлома: ~${formatTime(data.time_to_crack)}</div>
-                            <div>${data.compromised ? 
-                                '⚠️ ВНИМАНИЕ! Пароль найден в утечках данных!' : 
-                                '✅ Пароль не обнаружен в утечках'}</div>
-                            ${warningsHTML}
-                        </div>
-                    `;
-                    showToast('Проверка завершена');
-                } else {
-                    throw new Error(data.error || 'Неизвестная ошибка сервера');
+                if (!response.ok) {
+                    throw new Error(data.error || 'Ошибка сервера');
                 }
+
+                const strength = data.strength || 1;
+                const [strengthText, color] = strengthMap[strength] || ['Неизвестно', '#ddd'];
+                
+                let warningsHTML = '';
+                if (data.warnings && data.warnings.length > 0) {
+                    warningsHTML = `
+                        <div class="warnings">
+                            <strong>⚠️ Проблемы:</strong>
+                            <ul class="warning-list">
+                                ${data.warnings.map(w => `<li>${w}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+
+                const entropyHTML = `
+                    <div class="entropy-details">
+                        <table>
+                            <tr><td>Стандартная энтропия:</td><td>${data.entropy.standard.toFixed(2)} бит</td></tr>
+                            <tr><td>Энтропия Шеннона:</td><td>${data.entropy.shannon.toFixed(2)} бит</td></tr>
+                            <tr><td>Комбинированная оценка:</td><td>${data.entropy.combined.toFixed(2)} бит</td></tr>
+                        </table>
+                    </div>
+                `;
+
+                resultDiv.innerHTML = `
+                    <div class="status-item" style="border-left: 5px solid ${color}">
+                        ${entropyHTML}
+                        <div>🔐 Уровень безопасности: <strong style="color: ${color}">${strengthText}</strong></div>
+                        <div>⏱ Примерное время взлома: ~${formatTime(data.time_to_crack)}</div>
+                        <div>${data.compromised ? 
+                            '⚠️ ВНИМАНИЕ! Пароль найден в утечках данных!' : 
+                            '✅ Пароль не обнаружен в утечках'}</div>
+                        ${warningsHTML}
+                    </div>
+                `;
+                showToast('Проверка завершена');
             } catch (error) {
                 resultDiv.innerHTML = `
                     <div class="error">
-                        Ошибка: ${error.message || 'Ошибка соединения'}
+                        Ошибка: ${error.message}
                     </div>
                 `;
-                showToast(error.message || 'Ошибка соединения', true);
+                showToast(error.message, true);
             } finally {
                 checkBtn.style.display = 'inline-block';
                 loader.style.display = 'none';
