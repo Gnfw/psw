@@ -1,457 +1,137 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Генератор и Проверка Паролей</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Password Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            max-width: 800px; 
-            margin: 20px auto; 
-            padding: 20px; 
-            background-color: #f0f2f5;
+        .security-bar {
+            transition: width 0.5s ease-in-out;
         }
-        .container { 
-            border: 1px solid #ddd; 
-            padding: 20px; 
-            border-radius: 8px; 
-            background: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .section { 
-            margin-bottom: 30px; 
-            padding: 20px;
-            border: 1px solid #eee;
-            border-radius: 8px;
-        }
-        .options-grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
-            gap: 10px; 
-            margin: 15px 0; 
-        }
-        button { 
-            background: #007bff; 
-            color: white; 
-            border: none; 
-            padding: 10px 20px; 
-            border-radius: 4px; 
-            cursor: pointer; 
-            transition: background 0.3s;
-        }
-        button:hover { background: #0056b3; }
-        .result { 
-            margin-top: 20px; 
-            padding: 15px; 
-            background: #f8f9fa; 
-            border-radius: 4px; 
-        }
-        .error { 
-            color: #dc3545; 
-            background: #ffeef0;
-            border: 1px solid #ffdce0;
-        }
-        input[type="number"], input[type="password"], input[type="text"], select { 
-            padding: 8px; 
-            margin: 5px 0; 
-            border: 1px solid #ddd; 
-            border-radius: 4px; 
-            width: 100%; 
-        }
-        .password-field { 
-            position: relative; 
-            display: inline-block; 
-            width: 100%;
-        }
-        .toggle-password { 
-            position: absolute; 
-            right: 10px; 
-            top: 50%; 
-            transform: translateY(-50%);
-            cursor: pointer;
-            user-select: none;
-            opacity: 0.7;
-        }
-        .strength-meter {
-            width: 100%;
-            height: 5px;
-            background: #ddd;
-            margin: 10px 0;
-            border-radius: 3px;
-        }
-        .strength-bar {
-            height: 100%;
-            border-radius: 3px;
-            transition: width 0.3s, background 0.3s;
-        }
-        .copy-btn {
-            margin-left: 10px;
-            padding: 5px 10px;
-            background: #28a745;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        .copy-btn:hover { background: #218838; }
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            background: #28a745;
-            color: white;
-            border-radius: 4px;
-            display: none;
-            z-index: 1000;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            animation: slideIn 0.3s ease-out;
-        }
-        .toast.error { 
-            background: #dc3545; 
-        }
-        @keyframes slideIn {
-            from { transform: translateX(100%); }
-            to { transform: translateX(0); }
-        }
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .warning-list {
-            margin: 5px 0;
-            padding-left: 20px;
-            color: #856404;
-        }
-        .entropy-details table {
-            width: 100%;
-            margin: 10px 0;
-        }
-        .entropy-details td {
-            padding: 5px;
-            border-bottom: 1px solid #ddd;
-        }
-        .compromised-warning {
-            color: #dc3545;
-            font-weight: bold;
-            margin: 10px 0;
-        }
-        .language-selector {
-            margin: 15px 0;
+        .dark-gradient {
+            background: linear-gradient(135deg, #1a1b1f 0%, #2d2f36 100%);
         }
     </style>
 </head>
-<body>
-    <div id="toast" class="toast"></div>
-    
-    <div class="container">
-        <div class="section">
-            <h1>🔒 Генератор Паролей</h1>
-            
-            <div class="language-selector">
-                <label>Язык генерации:
-                    <select id="language">
-                        <option value="english">Английский</option>
-                        <option value="russian">Русский</option>
-                    </select>
-                </label>
-            </div>
+<body class="dark-gradient min-h-screen text-gray-100">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <header class="mb-12 text-center">
+            <h1 class="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                Генератор безопасных паролей
+            </h1>
+            <p class="text-gray-400">Создавайте криптостойкие пароли и проверяйте их надёжность</p>
+        </header>
 
-            <div>
-                <label>Длина пароля: 
-                    <input type="number" id="length" value="16" min="12" max="100">
-                </label>
-            </div>
-            
-            <h3>Настройки:</h3>
-            <div class="options-grid">
-                <label><input type="checkbox" name="option" value="OPT_MNEMONIC" onchange="toggleMnemonicOptions()"> Мнемоническая фраза</label>
-                <label><input type="checkbox" name="option" value="OPT_LOWERCASE"> Строчные буквы</label>
-                <label><input type="checkbox" name="option" value="OPT_UPPERCASE"> Прописные буквы</label>
-                <label><input type="checkbox" name="option" value="OPT_DIGITS"> Цифры</label>
-                <label><input type="checkbox" name="option" value="OPT_SPECIAL"> Спецсимволы</label>
-                <label><input type="checkbox" name="option" value="OPT_RANDOM_CASE"> Случайный регистр</label>
-                <label><input type="checkbox" name="option" value="OPT_SEPARATORS"> Разделители</label>
-                <label><input type="checkbox" name="option" value="OPT_AVOID_SIMILAR"> Исключить похожие</label>
-                <label><input type="checkbox" name="option" value="OPT_UNICODE"> Unicode символы</label>
-            </div>
+        <!-- Main Card -->
+        <div class="bg-gray-800 rounded-xl shadow-2xl p-6 mb-8">
+            <!-- Generator Section -->
+            <section class="mb-8">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                    </svg>
+                    Генерация пароля
+                </h2>
 
-            <div class="custom-charset-container">
-                <input type="text" id="customCharset" 
-                       placeholder="Свои символы (например: 🤖⚡🎉)"
-                       style="width: 100%">
-            </div>
-            
-            <button onclick="generatePassword()">
-                <span id="generateText">Сгенерировать пароль</span>
-                <span id="generateLoader" class="loading" style="display: none;"></span>
-            </button>
-            <div class="strength-meter">
-                <div class="strength-bar" style="--strength: 0"></div>
-            </div>
-            <div class="result" id="generationResult"></div>
-        </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Controls -->
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm mb-2">Длина пароля</label>
+                            <input type="number" id="length" value="16" min="8" max="100" 
+                                   class="w-full bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
 
-        <div class="section">
-            <h1>🔍 Проверка Пароля</h1>
-            <div class="password-field">
-                <input type="password" id="passwordToCheck" 
-                       placeholder="Введите пароль для проверки">
-                <span class="toggle-password" onclick="togglePasswordVisibility()">👁️</span>
-            </div>
+                        <div class="space-y-2">
+                            <label class="block text-sm mb-2">Настройки:</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="flex items-center space-x-2">
+                                    <input type="checkbox" class="form-checkbox text-blue-500" option="OPT_LOWERCASE" checked>
+                                    <span>Строчные буквы</span>
+                                </label>
+                                <!-- Другие опции -->
+                            </div>
+                        </div>
 
-            <button onclick="checkPassword()" style="margin-top: 15px;">
-                <span id="checkText">Проверить безопасность</span>
-                <span id="checkLoader" class="loading" style="display: none;"></span>
-            </button>
-            <div class="result" id="checkResult"></div>
+                        <button onclick="generatePassword()" 
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-all">
+                            Сгенерировать пароль
+                        </button>
+                    </div>
+
+                    <!-- Result Display -->
+                    <div class="bg-gray-900 rounded-lg p-4">
+                        <div class="flex items-center mb-4">
+                            <input type="text" id="password-result" readonly 
+                                   class="flex-1 bg-transparent text-xl font-mono outline-none">
+                            <button onclick="copyPassword()" 
+                                    class="ml-2 p-2 hover:bg-gray-800 rounded-lg">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Security Meter -->
+                        <div class="mb-4">
+                            <div class="h-2 bg-gray-700 rounded-full mb-2">
+                                <div id="security-bar" class="security-bar h-2 rounded-full bg-green-500" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span id="strength-text">Надёжность</span>
+                                <span id="crack-time">Время взлома: -</span>
+                            </div>
+                        </div>
+
+                        <!-- Warnings -->
+                        <div id="warnings" class="space-y-2 text-sm"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Divider -->
+            <hr class="border-gray-700 my-8">
+
+            <!-- Checker Section -->
+            <section>
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Проверка пароля
+                </h2>
+
+                <div class="flex flex-col md:flex-row gap-4">
+                    <input type="text" id="password-check" placeholder="Введите пароль для проверки" 
+                           class="flex-1 bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 outline-none">
+                    <button onclick="checkPassword()" 
+                            class="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-2 rounded-lg transition-all">
+                        Проверить
+                    </button>
+                </div>
+
+                <div id="check-results" class="mt-4 space-y-2"></div>
+            </section>
         </div>
     </div>
 
     <script>
-        const strengthMap = {
-            1: ['Слабый', '#ff4444'],
-            2: ['Средний', '#ffbb33'],
-            3: ['Надежный', '#00C851'],
-            4: ['Очень надежный', '#007E33'],
-            5: ['Ультра надежный', '#004D1A']
-        };
-
-        function toggleMnemonicOptions() {
-            const isMnemonic = document.querySelector('input[name="option"][value="OPT_MNEMONIC"]').checked;
-            const randomCase = document.querySelector('input[name="option"][value="OPT_RANDOM_CASE"]');
-            randomCase.disabled = !isMnemonic;
-            if (!isMnemonic) randomCase.checked = false;
-        }
-
-        function showToast(message, isError = false) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.className = `toast ${isError ? 'error' : ''}`;
-            toast.style.display = 'block';
-            setTimeout(() => toast.style.display = 'none', 3000);
-        }
-
-        function updateStrengthBar(strength) {
-            const bar = document.querySelector('.strength-bar');
-            if (!bar) return;
-            bar.style.width = `${strength * 20}%`;
-            bar.style.background = strengthMap[Math.min(strength, 5)][1];
-        }
-
-        function formatTime(seconds) {
-            if (seconds < 1) return "мгновенно";
-            const units = [
-                { name: 'веков', value: 3.154e9 },
-                { name: 'лет', value: 3.154e7 },
-                { name: 'дней', value: 86400 },
-                { name: 'часов', value: 3600 },
-            ];
-            
-            for (const unit of units) {
-                if (seconds >= unit.value) {
-                    const count = Math.floor(seconds / unit.value);
-                    return `${count} ${unit.name}`;
-                }
-            }
-            return "менее часа";
-        }
-
         async function generatePassword() {
-            const generateBtn = document.querySelector('#generateText');
-            const loader = document.querySelector('#generateLoader');
-            const resultDiv = document.getElementById('generationResult');
-            
-            generateBtn.style.display = 'none';
-            loader.style.display = 'inline-block';
-            resultDiv.innerHTML = '<div class="status-item">Генерация...</div>';
-
-            try {
-                const lang = document.getElementById('language').value;
-                const length = parseInt(document.getElementById('length').value);
-                let options = Array.from(document.querySelectorAll('input[name="option"]:checked'))
-                    .map(el => el.value);
-                const customCharset = document.getElementById('customCharset').value;
-
-                if (isNaN(length) || length < 12 || length > 100) {
-                    throw new Error('Длина пароля должна быть от 12 до 100 символов');
-                }
-
-                // Автоматически добавляем OPT_CUSTOM_CHARSET при наличии кастомных символов
-                if (customCharset) {
-                    options.push('OPT_CUSTOM_CHARSET');
-                }
-
-                const response = await fetch('/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        length,
-                        options,
-                        langs: [lang],
-                        custom_charset: customCharset
-                    })
-                });
-
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    throw new Error(data.error || 'Ошибка сервера');
-                }
-
-                const strength = data.strength || 1;
-                const [strengthText] = strengthMap[strength] || ['Неизвестно'];
-                updateStrengthBar(strength);
-                
-                let warningsHTML = '';
-                if (data.warnings && data.warnings.length > 0) {
-                    warningsHTML = `
-                        <div class="warnings">
-                            <strong>⚠️ Проблемы:</strong>
-                            <ul class="warning-list">
-                                ${data.warnings.map(w => `<li>${w}</li>`).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-
-                const entropyHTML = `
-                    <div class="entropy-details">
-                        <table>
-                            <tr><td>Стандартная энтропия:</td><td>${data.entropy.standard.toFixed(2)} бит</td></tr>
-                            <tr><td>Энтропия Шеннона:</td><td>${data.entropy.shannon.toFixed(2)} бит</td></tr>
-                            <tr><td>Комбинированная оценка:</td><td>${data.entropy.combined.toFixed(2)} бит</td></tr>
-                        </table>
-                        Примерное время взлома: ~${formatTime(data.time_to_crack)}
-                    </div>
-                `;
-
-                resultDiv.innerHTML = `
-                    <div class="status-item">
-                        <strong>Пароль:</strong> <span id="generatedPassword">${data.password}</span>
-                        <button class="copy-btn" onclick="copyPassword()">Копировать</button>
-                        ${entropyHTML}
-                        <div style="margin-top: 10px;">
-                            Уровень безопасности: <span style="color: ${strengthMap[strength][1]}">${strengthText}</span><br>
-                            ${data.compromised ? 
-                                '<div class="compromised-warning">⚠️ ВНИМАНИЕ! Пароль найден в утечках данных!</div>' : 
-                                '✅ Пароль безопасен (не найден в утечках)'}
-                        </div>
-                        ${warningsHTML}
-                    </div>
-                `;
-                showToast('Пароль успешно сгенерирован!');
-            } catch (error) {
-                resultDiv.innerHTML = `
-                    <div class="error">
-                        Ошибка: ${error.message}
-                    </div>
-                `;
-                showToast(error.message, true);
-            } finally {
-                generateBtn.style.display = 'inline-block';
-                loader.style.display = 'none';
-            }
-        }
-
-        function copyPassword() {
-            const passwordElement = document.getElementById('generatedPassword');
-            if (passwordElement) {
-                navigator.clipboard.writeText(passwordElement.innerText)
-                    .then(() => showToast('Пароль скопирован!'))
-                    .catch(() => showToast('Не удалось скопировать', true));
-            }
-        }
-
-        function togglePasswordVisibility() {
-            const input = document.getElementById('passwordToCheck');
-            const toggleBtn = document.querySelector('.toggle-password');
-            input.type = input.type === 'password' ? 'text' : 'password';
-            toggleBtn.textContent = input.type === 'password' ? '👁️' : '👁️🗨️';
+            // Логика генерации через API
         }
 
         async function checkPassword() {
-            const checkBtn = document.querySelector('#checkText');
-            const loader = document.querySelector('#checkLoader');
-            const resultDiv = document.getElementById('checkResult');
-            const password = document.getElementById('passwordToCheck').value.trim();
-            
-            checkBtn.style.display = 'none';
-            loader.style.display = 'inline-block';
-            resultDiv.innerHTML = '<div class="status-item">Проверка...</div>';
+            // Логика проверки через API
+        }
 
-            try {
-                if (!password) throw new Error("Введите пароль для проверки");
-                
-                const response = await fetch('/check', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ password })
-                });
+        function copyPassword() {
+            // Логика копирования
+        }
 
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    throw new Error(data.error || 'Ошибка сервера');
-                }
-
-                const strength = data.strength || 1;
-                const [strengthText, color] = strengthMap[strength] || ['Неизвестно', '#ddd'];
-                
-                let warningsHTML = '';
-                if (data.warnings && data.warnings.length > 0) {
-                    warningsHTML = `
-                        <div class="warnings">
-                            <strong>⚠️ Проблемы:</strong>
-                            <ul class="warning-list">
-                                ${data.warnings.map(w => `<li>${w}</li>`).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-
-                const entropyHTML = `
-                    <div class="entropy-details">
-                        <table>
-                            <tr><td>Стандартная энтропия:</td><td>${data.entropy.standard.toFixed(2)} бит</td></tr>
-                            <tr><td>Энтропия Шеннона:</td><td>${data.entropy.shannon.toFixed(2)} бит</td></tr>
-                            <tr><td>Комбинированная оценка:</td><td>${data.entropy.combined.toFixed(2)} бит</td></tr>
-                        </table>
-                    </div>
-                `;
-
-                resultDiv.innerHTML = `
-                    <div class="status-item" style="border-left: 5px solid ${color}">
-                        ${entropyHTML}
-                        <div>🔐 Уровень безопасности: <strong style="color: ${color}">${strengthText}</strong></div>
-                        <div>⏱ Примерное время взлома: ~${formatTime(data.time_to_crack)}</div>
-                        <div>${data.compromised ? 
-                            '⚠️ ВНИМАНИЕ! Пароль найден в утечках данных!' : 
-                            '✅ Пароль не обнаружен в утечках'}</div>
-                        ${warningsHTML}
-                    </div>
-                `;
-                showToast('Проверка завершена');
-            } catch (error) {
-                resultDiv.innerHTML = `
-                    <div class="error">
-                        Ошибка: ${error.message}
-                    </div>
-                `;
-                showToast(error.message, true);
-            } finally {
-                checkBtn.style.display = 'inline-block';
-                loader.style.display = 'none';
-            }
+        function updateSecurityDisplay(data) {
+            // Обновление индикаторов безопасности
         }
     </script>
 </body>
