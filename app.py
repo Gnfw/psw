@@ -140,23 +140,35 @@ def check_password_strength(password: str, options: PasswordOptions, langs: List
                 warnings.append(f"Обнаружено {lang} слово с заменой символов")
 
     checks = [
-        (len(set(password)) < 4 and not (options & PasswordOptions.OPT_NO_REPEAT_CHARS),
-        any(password[i] == password[i+1] == password[i+2] for i in range(len(password)-2)),
-        bool(re.search(r'(.)\1{2}', password)),
-        bool(re.search(r'\d{4,}', password)),
-        bool(re.search(r'(19|20)\d{2}', password)),
-        bool(re.search(r'qwerty|12345|password|asdfgh|123456|111111', password.lower()))
+        (
+            len(set(password)) < 4 and 
+            not (options & PasswordOptions.OPT_NO_REPEAT_CHARS),
+            "Слишком много повторяющихся символов"
+        ),
+        (
+            any(password[i] == password[i+1] == password[i+2] for i in range(len(password)-2)),
+            "Три повторяющихся символа подряд"
+        ),
+        (
+            bool(re.search(r'(.)\1{2}', password)),
+            "Повторяющиеся паттерны"
+        ),
+        (
+            bool(re.search(r'\d{4,}', password)),
+            "Последовательности цифр"
+        ),
+        (
+            bool(re.search(r'(19|20)\d{2}', password)),
+            "Обнаружен год"
+        ),
+        (
+            bool(re.search(r'qwerty|12345|password|asdfgh|123456|111111', password.lower())),
+            "Обнаружен опасный паттерн"
+        )
     ]
 
     score = 4
-    for condition, warning in zip(checks, [
-        "Слишком много повторяющихся символов",
-        "Три повторяющихся символа подряд",
-        "Повторяющиеся паттерны",
-        "Последовательности цифр",
-        "Обнаружен год",
-        "Обнаружен опасный паттерн"
-    ]):
+    for condition, warning in checks:
         if condition:
             warnings.append(warning)
             score -= 1
