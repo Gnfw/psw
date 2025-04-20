@@ -72,6 +72,18 @@
             user-select: none;
             opacity: 0.7;
         }
+        .strength-meter {
+            width: 100%;
+            height: 5px;
+            background: #ddd;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .strength-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s, background 0.3s;
+        }
         .copy-btn {
             margin-left: 10px;
             padding: 5px 10px;
@@ -83,36 +95,6 @@
             transition: background 0.3s;
         }
         .copy-btn:hover { background: #218838; }
-        .custom-charset-container { margin: 15px 0; }
-        .warning-list { 
-            margin: 5px 0; 
-            padding-left: 20px; 
-            color: #856404;
-        }
-        .status-item { 
-            margin: 10px 0; 
-            padding: 15px; 
-            border-radius: 4px; 
-            border: 1px solid transparent;
-        }
-        .weak { 
-            background: #ffcccc; 
-            border-color: #ffb3b3;
-        }
-        .medium { 
-            background: #fff3cd; 
-            border-color: #ffeeba;
-        }
-        .strong { 
-            background: #d4edda; 
-            border-color: #c3e6cb;
-        }
-        .warnings { 
-            margin-top: 10px; 
-            padding: 10px; 
-            background: #fff3cd; 
-            border-radius: 4px; 
-        }
         .toast {
             position: fixed;
             bottom: 20px;
@@ -145,41 +127,23 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        .warning-list {
+            margin: 5px 0;
+            padding-left: 20px;
+            color: #856404;
+        }
+        .entropy-details table {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .entropy-details td {
+            padding: 5px;
+            border-bottom: 1px solid #ddd;
+        }
         .compromised-warning {
             color: #dc3545;
             font-weight: bold;
             margin: 10px 0;
-        }
-        .context-input {
-            margin: 15px 0;
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .entropy-details {
-            margin: 10px 0;
-            padding: 10px;
-            background: #e9ecef;
-            border-radius: 4px;
-        }
-        .strength-meter {
-            width: 100%;
-            height: 5px;
-            background: #ddd;
-            margin: 10px 0;
-            border-radius: 3px;
-        }
-        .strength-bar {
-            height: 100%;
-            border-radius: 3px;
-            transition: width 0.3s, background 0.3s;
-        }
-        @media (max-width: 600px) {
-            .container {
-                padding: 10px;
-                margin: 10px;
-            }
         }
     </style>
 </head>
@@ -190,17 +154,9 @@
         <div class="section">
             <h1>🔒 Генератор Паролей</h1>
             
-            <div class="custom-charset-container">
-                <input type="text" id="customCharset" 
-                       placeholder="Введите свои символы (например: 🤖⚡🎉❤️)"
-                       class="custom-charset"
-                       style="padding: 10px;">
-                <button onclick="toggleCustomCharset()">Использовать эти символы</button>
-            </div>
-
             <div>
                 <label>Длина пароля: 
-                    <input type="number" id="length" value="16" min="12" max="100" style="padding: 10px;">
+                    <input type="number" id="length" value="16" min="12" max="100">
                 </label>
             </div>
             
@@ -211,9 +167,9 @@
                 <label><input type="checkbox" name="option" value="OPT_UPPERCASE"> Прописные буквы</label>
                 <label><input type="checkbox" name="option" value="OPT_DIGITS"> Цифры</label>
                 <label><input type="checkbox" name="option" value="OPT_SPECIAL"> Спецсимволы</label>
+                <label><input type="checkbox" name="option" value="OPT_RANDOM_CASE"> Случайный регистр</label>
                 <label><input type="checkbox" name="option" value="OPT_SEPARATORS"> Разделители</label>
                 <label><input type="checkbox" name="option" value="OPT_AVOID_SIMILAR"> Исключить похожие</label>
-                <label><input type="checkbox" name="option" value="OPT_NO_REPEAT_CHARS"> Без повторений</label>
             </div>
 
             <div>
@@ -221,7 +177,7 @@
                        placeholder="Запрещенные слова (через запятую)">
             </div>
             
-            <button onclick="generatePassword()" style="padding: 12px 25px;">
+            <button onclick="generatePassword()">
                 <span id="generateText">Сгенерировать пароль</span>
                 <span id="generateLoader" class="loading" style="display: none;"></span>
             </button>
@@ -236,7 +192,6 @@
             <div class="password-field">
                 <input type="password" id="passwordToCheck" 
                        placeholder="Введите пароль для проверки"
-                       style="padding: 10px;"
                        oninput="debouncedCheck()">
                 <span class="toggle-password" onclick="togglePasswordVisibility()">👁️</span>
             </div>
@@ -255,34 +210,41 @@
     </div>
 
     <script>
-        let useCustomCharset = false;
-        let timeout;
+        const strengthMap = {
+            1: ['Слабый', '#ff4444'],
+            2: ['Средний', '#ffbb33'],
+            3: ['Надежный', '#00C851'],
+            4: ['Очень надежный', '#007E33'],
+            5: ['Ультра надежный', '#004D1A']
+        };
 
+        let timeout;
         function debouncedCheck() {
             clearTimeout(timeout);
             timeout = setTimeout(checkPassword, 500);
         }
 
-        function updateStrengthBar(strength) {
-            const bar = document.querySelector('.strength-bar');
-            const colors = ['#ff4444', '#ffbb33', '#00C851'];
-            bar.style.width = `${strength * 20}%`;
-            bar.style.background = colors[Math.min(strength-1, 2)];
+        function toggleMnemonicOptions() {
+            const isMnemonic = document.querySelector('input[name="option"][value="OPT_MNEMONIC"]').checked;
+            const allowed = ['OPT_DIGITS', 'OPT_SPECIAL', 'OPT_RANDOM_CASE'];
+            
+            document.querySelectorAll('input[name="option"]').forEach(opt => {
+                if (allowed.includes(opt.value)) {
+                    opt.disabled = !isMnemonic;
+                    if (!isMnemonic) opt.checked = false;
+                } else if (opt.value !== 'OPT_MNEMONIC') {
+                    opt.disabled = isMnemonic;
+                    if (isMnemonic) opt.checked = false;
+                }
+            });
         }
 
-       function toggleMnemonicOptions() {
-    const isMnemonic = document.querySelector('input[name="option"][value="OPT_MNEMONIC"]').checked;
-    // Разблокируем нужные опции
-    const allowedWithMnemonic = ['OPT_DIGITS', 'OPT_SPECIAL', 'OPT_RANDOM_CASE'];
-    document.querySelectorAll('input[name="option"]').forEach(opt => {
-        if (allowedWithMnemonic.includes(opt.value)) {
-            opt.disabled = isMnemonic ? false : opt.disabled;
-        } else {
-            opt.disabled = isMnemonic;
-            if(isMnemonic) opt.checked = false;
+        function updateStrengthBar(strength) {
+            const bar = document.querySelector('.strength-bar');
+            if (!bar) return;
+            bar.style.width = `${strength * 20}%`;
+            bar.style.background = strengthMap[Math.min(strength, 5)][1];
         }
-    });
-}
 
         function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
@@ -290,22 +252,6 @@
             toast.className = `toast ${isError ? 'error' : ''}`;
             toast.style.display = 'block';
             setTimeout(() => toast.style.display = 'none', 3000);
-        }
-
-        function toggleCustomCharset() {
-            useCustomCharset = !useCustomCharset;
-            const options = document.querySelectorAll('input[name="option"]');
-            const customInput = document.getElementById('customCharset');
-            
-            options.forEach(opt => {
-                opt.checked = false;
-                opt.disabled = useCustomCharset;
-            });
-            
-            customInput.disabled = !useCustomCharset;
-            showToast(useCustomCharset ? 
-                "Режим пользовательских символов активирован" : 
-                "Стандартные настройки восстановлены");
         }
 
         function formatTime(seconds) {
@@ -349,22 +295,12 @@
                     .map(s => s.trim())
                     .filter(Boolean);
 
-                if(useCustomCharset) {
-                    options.push('OPT_CUSTOM_CHARSET');
-                    const customChars = document.getElementById('customCharset').value;
-                    if (new Set(customChars).size < 4) {
-                        throw new Error('Набор символов должен содержать минимум 4 уникальных символа');
-                    }
-                }
-
                 const response = await fetch('/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         length,
                         options,
-                        separator: '-',
-                        custom_charset: document.getElementById('customCharset').value,
                         forbidden_context: forbiddenContext
                     })
                 });
@@ -372,15 +308,9 @@
                 const data = await response.json();
                 
                 if (response.ok) {
-                    const strengthMap = {
-                        1: ['Слабый', 'weak'],
-                        2: ['Средний', 'medium'],
-                        3: ['Надежный', 'strong'],
-                        4: ['Очень надежный', 'strong'],
-                        5: ['Ультра надежный', 'strong']
-                    };
-                    const [strengthText, strengthClass] = strengthMap[data.strength] || ['Неизвестно', ''];
-                    updateStrengthBar(data.strength);
+                    const strength = data.strength || 1;
+                    const [strengthText] = strengthMap[strength] || ['Неизвестно'];
+                    updateStrengthBar(strength);
                     
                     let warningsHTML = '';
                     if (data.warnings && data.warnings.length > 0) {
@@ -398,19 +328,14 @@
                         <div class="entropy-details">
                             <table>
                                 <tr><td>Стандартная энтропия:</td><td>${data.entropy.standard.toFixed(2)} бит</td></tr>
-                                <tr><td>Энтропия Шеннона:</td><td>${data.entropy.shannon.toFixed(2)} бит</td></tr>
                                 <tr><td>Комбинированная оценка:</td><td>${data.entropy.combined.toFixed(2)} бит</td></tr>
                             </table>
                             Примерное время взлома: ~${formatTime(data.time_to_crack)}
                         </div>
                     `;
 
-                    const mnemonicWarning = options.includes('OPT_MNEMONIC') && length < 12 ? 
-                        `<div class="mnemonic-warning">⚠️ Для мнемонических фраз рекомендуется длина от 12 символов</div>` : '';
-
                     resultDiv.innerHTML = `
-                        ${mnemonicWarning}
-                        <div class="status-item ${strengthClass}">
+                        <div class="status-item">
                             <strong>Пароль:</strong> <span id="generatedPassword">${data.password}</span>
                             <button class="copy-btn" onclick="copyPassword()">Копировать</button>
                             ${entropyHTML}
@@ -429,7 +354,7 @@
                 }
             } catch (error) {
                 resultDiv.innerHTML = `
-                    <div class="status-item error">
+                    <div class="error">
                         Ошибка: ${error.message || 'Ошибка соединения'}
                     </div>
                 `;
@@ -442,7 +367,7 @@
 
         function copyPassword() {
             const passwordElement = document.getElementById('generatedPassword');
-            if(passwordElement) {
+            if (passwordElement) {
                 navigator.clipboard.writeText(passwordElement.innerText)
                     .then(() => showToast('Пароль скопирован!'))
                     .catch(() => showToast('Не удалось скопировать', true));
@@ -467,7 +392,7 @@
             resultDiv.innerHTML = '<div class="status-item">Проверка...</div>';
 
             if (!password) {
-                resultDiv.innerHTML = '<div class="status-item error">Введите пароль для проверки</div>';
+                resultDiv.innerHTML = '<div class="error">Введите пароль для проверки</div>';
                 showToast('Введите пароль для проверки', true);
                 checkBtn.style.display = 'inline-block';
                 loader.style.display = 'none';
@@ -492,10 +417,9 @@
                 const data = await response.json();
                 
                 if (response.ok) {
-                    let strengthClass = 'weak';
-                    if (data.strength >= 3) strengthClass = 'medium';
-                    if (data.strength >= 4) strengthClass = 'strong';
-
+                    const strength = data.strength || 1;
+                    const [strengthText, color] = strengthMap[strength] || ['Неизвестно', '#ddd'];
+                    
                     let warningsHTML = '';
                     if (data.warnings && data.warnings.length > 0) {
                         warningsHTML = `
@@ -512,20 +436,19 @@
                         <div class="entropy-details">
                             <table>
                                 <tr><td>Стандартная энтропия:</td><td>${data.entropy.standard.toFixed(2)} бит</td></tr>
-                                <tr><td>Энтропия Шеннона:</td><td>${data.entropy.shannon.toFixed(2)} бит</td></tr>
                                 <tr><td>Комбинированная оценка:</td><td>${data.entropy.combined.toFixed(2)} бит</td></tr>
                             </table>
                         </div>
                     `;
 
                     resultDiv.innerHTML = `
-                        <div class="status-item ${strengthClass}">
+                        <div class="status-item" style="border-left: 5px solid ${color}">
                             ${entropyHTML}
-                            <div>🔐 Уровень безопасности: <strong>${strengthMap[data.strength][0]}</strong></div>
+                            <div>🔐 Уровень безопасности: <strong>${strengthText}</strong></div>
                             <div>⏱ Примерное время взлома: ~${formatTime(data.time_to_crack)}</div>
                             <div>${data.compromised ? 
                                 '⚠️ ВНИМАНИЕ! Пароль найден в утечках данных!' : 
-                                '✅ Пароль не обнаружен в известных утечках'}</div>
+                                '✅ Пароль не обнаружен в утечках'}</div>
                             ${warningsHTML}
                         </div>
                     `;
@@ -535,7 +458,7 @@
                 }
             } catch (error) {
                 resultDiv.innerHTML = `
-                    <div class="status-item error">
+                    <div class="error">
                         Ошибка: ${error.message || 'Ошибка соединения'}
                     </div>
                 `;
