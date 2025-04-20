@@ -26,7 +26,7 @@
         }
         .options-grid { 
             display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
             gap: 10px; 
             margin: 15px 0; 
         }
@@ -56,11 +56,12 @@
             margin: 5px 0; 
             border: 1px solid #ddd; 
             border-radius: 4px; 
-            width: 200px; 
+            width: 100%; 
         }
         .password-field { 
             position: relative; 
             display: inline-block; 
+            width: 100%;
         }
         .toggle-password { 
             position: absolute; 
@@ -162,25 +163,23 @@
             background: #e9ecef;
             border-radius: 4px;
         }
-        .entropy-details table {
+        .strength-meter {
             width: 100%;
+            height: 5px;
+            background: #ddd;
             margin: 10px 0;
+            border-radius: 3px;
         }
-        .entropy-details td {
-            padding: 5px;
-            border-bottom: 1px solid #ddd;
+        .strength-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s, background 0.3s;
         }
-        .mnemonic-warning {
-            color: #856404;
-            background-color: #fff3cd;
-            border-color: #ffeeba;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        .disabled-option {
-            opacity: 0.6;
-            pointer-events: none;
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+                margin: 10px;
+            }
         }
     </style>
 </head>
@@ -195,13 +194,13 @@
                 <input type="text" id="customCharset" 
                        placeholder="Введите свои символы (например: 🤖⚡🎉❤️)"
                        class="custom-charset"
-                       style="width: 300px; padding: 10px;">
+                       style="padding: 10px;">
                 <button onclick="toggleCustomCharset()">Использовать эти символы</button>
             </div>
 
             <div>
                 <label>Длина пароля: 
-                    <input type="number" id="length" value="16" min="8" max="100" style="padding: 10px;">
+                    <input type="number" id="length" value="16" min="12" max="100" style="padding: 10px;">
                 </label>
             </div>
             
@@ -226,6 +225,9 @@
                 <span id="generateText">Сгенерировать пароль</span>
                 <span id="generateLoader" class="loading" style="display: none;"></span>
             </button>
+            <div class="strength-meter">
+                <div class="strength-bar" style="--strength: 0"></div>
+            </div>
             <div class="result" id="generationResult"></div>
         </div>
 
@@ -234,7 +236,8 @@
             <div class="password-field">
                 <input type="password" id="passwordToCheck" 
                        placeholder="Введите пароль для проверки"
-                       style="padding: 10px; width: 300px;">
+                       style="padding: 10px;"
+                       oninput="debouncedCheck()">
                 <span class="toggle-password" onclick="togglePasswordVisibility()">👁️</span>
             </div>
             
@@ -253,6 +256,19 @@
 
     <script>
         let useCustomCharset = false;
+        let timeout;
+
+        function debouncedCheck() {
+            clearTimeout(timeout);
+            timeout = setTimeout(checkPassword, 500);
+        }
+
+        function updateStrengthBar(strength) {
+            const bar = document.querySelector('.strength-bar');
+            const colors = ['#ff4444', '#ffbb33', '#00C851'];
+            bar.style.width = `${strength * 20}%`;
+            bar.style.background = colors[Math.min(strength-1, 2)];
+        }
 
         function toggleMnemonicOptions() {
             const isMnemonic = document.querySelector('input[name="option"][value="OPT_MNEMONIC"]').checked;
@@ -326,8 +342,8 @@
 
             try {
                 const length = parseInt(document.getElementById('length').value);
-                if (isNaN(length) || length < 8 || length > 100) {
-                    throw new Error('Некорректная длина пароля (8-100)');
+                if (isNaN(length) || length < 12 || length > 100) {
+                    throw new Error('Некорректная длина пароля (12-100)');
                 }
 
                 const options = Array.from(document.querySelectorAll('input[name="option"]:checked'))
@@ -369,6 +385,7 @@
                         5: ['Ультра надежный', 'strong']
                     };
                     const [strengthText, strengthClass] = strengthMap[data.strength] || ['Неизвестно', ''];
+                    updateStrengthBar(data.strength);
                     
                     let warningsHTML = '';
                     if (data.warnings && data.warnings.length > 0) {
@@ -481,8 +498,8 @@
                 
                 if (response.ok) {
                     let strengthClass = 'weak';
-                    if (data.strength === 'Средний') strengthClass = 'medium';
-                    if (data.strength.includes('Надежный')) strengthClass = 'strong';
+                    if (data.strength >= 3) strengthClass = 'medium';
+                    if (data.strength >= 4) strengthClass = 'strong';
 
                     let warningsHTML = '';
                     if (data.warnings && data.warnings.length > 0) {
@@ -509,12 +526,11 @@
                     resultDiv.innerHTML = `
                         <div class="status-item ${strengthClass}">
                             ${entropyHTML}
-                            <div>🔐 Уровень безопасности: <strong>${data.strength}</strong></div>
+                            <div>🔐 Уровень безопасности: <strong>${strengthMap[data.strength][0]}</strong></div>
                             <div>⏱ Примерное время взлома: ~${formatTime(data.time_to_crack)}</div>
                             <div>${data.compromised ? 
                                 '⚠️ ВНИМАНИЕ! Пароль найден в утечках данных!' : 
                                 '✅ Пароль не обнаружен в известных утечках'}</div>
-                            <div>💡 Рекомендация: ${data.recommendation}</div>
                             ${warningsHTML}
                         </div>
                     `;
