@@ -134,10 +134,11 @@ def check_password_strength(password: str, forbidden_context: List[str] = None) 
     
     checks = [
         (len(set(password)) < 4, "Слишком много повторяющихся символов"),
-        (any(password[i] == password[i+1] == password[i+2] for i in range(len(password)-2))),
-        (re.search(r'(.)\1{2}', password), "Повторяющиеся паттерны"),
-        (re.search(r'\d{4,}', password), "Последовательности цифр"),
-        (re.search(r'(19|20)\d{2}', password), "Обнаружен год"),
+        (any(password[i] == password[i+1] == password[i+2] for i in range(len(password)-2)),
+        "Три повторяющихся символа подряд"),
+        (bool(re.search(r'(.)\1{2}', password)), "Повторяющиеся паттерны"),
+        (bool(re.search(r'\d{4,}', password)), "Последовательности цифр"),
+        (bool(re.search(r'(19|20)\d{2}', password)), "Обнаружен год"),
         (check_common_patterns(password), "Обнаружен опасный паттерн"),
         (has_uniform_distribution(password), "Неравномерное распределение символов")
     ]
@@ -170,8 +171,8 @@ def generate_password_with_options(
         return generate_mnemonic_phrase(
             length=length,
             separator=separator,
-            add_number=options & PasswordOptions.OPT_DIGITS,
-            add_special=options & PasswordOptions.OPT_SPECIAL
+            add_number=bool(options & PasswordOptions.OPT_DIGITS),
+            add_special=bool(options & PasswordOptions.OPT_SPECIAL)
         )
     
     charset = ""
@@ -184,7 +185,7 @@ def generate_password_with_options(
             charset += string.ascii_lowercase
         if options & PasswordOptions.OPT_UPPERCASE:
             charset += string.ascii_uppercase
-        if options & PasswordOptions.OPT_DIGITS and not options & PasswordOptions.OPT_NO_DIGITS:
+        if options & PasswordOptions.OPT_DIGITS and not (options & PasswordOptions.OPT_NO_DIGITS):
             charset += string.digits
         if options & PasswordOptions.OPT_SPECIAL:
             charset += "!@#$%^&*()_+"
@@ -216,7 +217,7 @@ def handle_generate():
         length = int(data.get('length', 16))
         options = sum(getattr(PasswordOptions, opt) for opt in data.get('options', []))
         
-        if PasswordOptions.OPT_DIGITS in options and PasswordOptions.OPT_NO_DIGITS in options:
+        if (options & PasswordOptions.OPT_DIGITS) and (options & PasswordOptions.OPT_NO_DIGITS):
             raise ValueError("Конфликт опций: цифры и исключение цифр")
         
         password = generate_password_with_options(
