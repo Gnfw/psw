@@ -46,7 +46,7 @@ def load_dictionaries() -> Set[str]:
             words = {
                 word.strip().lower()
                 for word in response.text.splitlines()
-                if 4 <= len(word.strip()) <= 8 and word.isalpha()
+                if 5 <= len(word.strip()) <= 8 and word.isalpha()
             }
             all_words.update(words)
     except Exception as e:
@@ -57,30 +57,42 @@ DICTIONARY = load_dictionaries()
 
 def generate_mnemonic_phrase(
     length: int,
-    separator: str = "-",
-    add_number: bool = True,
-    add_special: bool = False
+    options: PasswordOptions,
+    separator: str = "-"
 ) -> str:
+    rng = secrets.SystemRandom()
     words = [w for w in DICTIONARY if 5 <= len(w) <= 8]
     if not words:
         words = BACKUP_WORDS
     
-    rng = secrets.SystemRandom()
-    num_words = max(3, min(6, length // 4))
+    # Расчет количества слов
+    min_words = max(4, math.ceil(length / 8))
+    num_words = min(min_words + 2, 8)
+    
     selected = rng.sample(words, num_words)
     
+    # Преобразование регистра
+    case_modes = []
+    if options & PasswordOptions.OPT_RANDOM_CASE:
+        case_modes = [str.lower, str.title, str.upper]
+    
     phrase = []
-    for i, word in enumerate(selected):
-        if rng.random() < 0.3:
-            word = word.title() if rng.random() < 0.5 else word.upper()
-        
+    for word in selected:
+        if case_modes:
+            word = rng.choice(case_modes)(word)
         phrase.append(word)
         
-        if add_number and rng.random() < 0.4:
+        # Обязательное добавление цифр/спецсимволов
+        if options & PasswordOptions.OPT_DIGITS and rng.random() < 0.6:
             phrase.append(str(rng.randint(0, 9)))
-            
-        if add_special and rng.random() < 0.2:
+        if options & PasswordOptions.OPT_SPECIAL and rng.random() < 0.4:
             phrase.append(rng.choice("!@#$%&*"))
+    
+    # Гарантированное наличие цифр/символов
+    if options & PasswordOptions.OPT_DIGITS and not any(c.isdigit() for c in phrase):
+        phrase.insert(rng.randint(1, len(phrase)), str(rng.randint(0, 9)))
+    if options & PasswordOptions.OPT_SPECIAL and not any(c in "!@#$%&*" for c in phrase):
+        phrase.insert(rng.randint(1, len(phrase)), rng.choice("!@#$%&*"))
     
     return separator.join(phrase)[:length]
 
