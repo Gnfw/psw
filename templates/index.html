@@ -182,7 +182,6 @@
                 <label><input type="checkbox" name="option" value="OPT_RANDOM_CASE"> Случайный регистр</label>
                 <label><input type="checkbox" name="option" value="OPT_SEPARATORS"> Разделители</label>
                 <label><input type="checkbox" name="option" value="OPT_AVOID_SIMILAR"> Исключить похожие</label>
-                <label><input type="checkbox" name="option" value="OPT_RUSSIAN"> Русские слова</label>
                 <label><input type="checkbox" name="option" value="OPT_UNICODE"> Unicode символы</label>
             </div>
 
@@ -190,11 +189,6 @@
                 <input type="text" id="customCharset" 
                        placeholder="Свои символы (например: 🤖⚡🎉)"
                        style="width: 100%">
-            </div>
-
-            <div>
-                <input type="text" class="context-input" id="forbiddenContext" 
-                       placeholder="Запрещенные слова (через запятую)">
             </div>
             
             <button onclick="generatePassword()">
@@ -213,11 +207,6 @@
                 <input type="password" id="passwordToCheck" 
                        placeholder="Введите пароль для проверки">
                 <span class="toggle-password" onclick="togglePasswordVisibility()">👁️</span>
-            </div>
-            
-            <div>
-                <input type="text" class="context-input" id="checkForbiddenContext" 
-                       placeholder="Запрещенные слова (через запятую)">
             </div>
 
             <button onclick="checkPassword()" style="margin-top: 15px;">
@@ -289,16 +278,17 @@
             try {
                 const lang = document.getElementById('language').value;
                 const length = parseInt(document.getElementById('length').value);
-                const options = Array.from(document.querySelectorAll('input[name="option"]:checked'))
+                let options = Array.from(document.querySelectorAll('input[name="option"]:checked'))
                     .map(el => el.value);
                 const customCharset = document.getElementById('customCharset').value;
-                const forbiddenContext = document.getElementById('forbiddenContext').value
-                    .split(',')
-                    .map(s => s.trim())
-                    .filter(Boolean);
 
                 if (isNaN(length) || length < 12 || length > 100) {
                     throw new Error('Длина пароля должна быть от 12 до 100 символов');
+                }
+
+                // Автоматически добавляем OPT_CUSTOM_CHARSET при наличии кастомных символов
+                if (customCharset) {
+                    options.push('OPT_CUSTOM_CHARSET');
                 }
 
                 const response = await fetch('/generate', {
@@ -307,9 +297,8 @@
                     body: JSON.stringify({
                         length,
                         options,
-                        lang,
-                        custom_charset: customCharset,
-                        forbidden_context: forbiddenContext
+                        langs: [lang],
+                        custom_charset: customCharset
                     })
                 });
 
@@ -403,18 +392,10 @@
             try {
                 if (!password) throw new Error("Введите пароль для проверки");
                 
-                const forbiddenContext = document.getElementById('checkForbiddenContext').value
-                    .split(',')
-                    .map(s => s.trim())
-                    .filter(Boolean);
-
                 const response = await fetch('/check', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        password,
-                        forbidden_context: forbiddenContext
-                    })
+                    body: JSON.stringify({ password })
                 });
 
                 const data = await response.json();
