@@ -68,16 +68,20 @@ def generate_mnemonic_phrase(length: int, options: PasswordOptions, separator: s
     num_words = min(base_word_count + 2, 8)
     selected = rng.sample(words, num_words)
     
-    case_functions = []
-    if options & PasswordOptions.OPT_RANDOM_CASE:
-        case_functions = [str.lower, str.title, str.upper]
-    
     phrase = []
     for word in selected:
-        if case_functions:
-            word = rng.choice(case_functions)(word)
+        # Случайный регистр для каждого символа
+        if options & PasswordOptions.OPT_RANDOM_CASE:
+            modified_word = []
+            for c in word:
+                if rng.random() < 0.5:
+                    modified_word.append(c.upper())
+                else:
+                    modified_word.append(c.lower())
+            word = ''.join(modified_word)
         else:
             word = word.lower()
+        
         phrase.append(word)
         
         if options & PasswordOptions.OPT_DIGITS and rng.random() < 0.6:
@@ -86,6 +90,7 @@ def generate_mnemonic_phrase(length: int, options: PasswordOptions, separator: s
         if options & PasswordOptions.OPT_SPECIAL and rng.random() < 0.4:
             phrase.append(rng.choice("!@#$%&*"))
     
+    # Гарантия наличия цифр/символов
     if options & PasswordOptions.OPT_DIGITS and not any(c.isdigit() for c in phrase):
         phrase.insert(rng.randint(1, len(phrase)), str(rng.randint(10, 99)))
     
@@ -95,18 +100,24 @@ def generate_mnemonic_phrase(length: int, options: PasswordOptions, separator: s
     return separator.join(phrase)[:length]
 
 def calculate_entropy(password: str) -> Dict:
-    components = re.split(r'\W+', password)
-    word_entropy = math.log2(len(DICTIONARY)) * sum(1 for w in components if w.lower() in DICTIONARY)
+    # Энтропия Шеннона
+    freq = Counter(password)
+    probs = [v/len(password) for v in freq.values()]
+    shannon = -sum(p * math.log2(p) for p in probs if p > 0) * len(password)
+    
+    # Стандартная энтропия
     char_types = sum([
         26 if any(c.islower() for c in password) else 0,
         26 if any(c.isupper() for c in password) else 0,
         10 if any(c.isdigit() for c in password) else 0,
         32 if any(c in "!@#$%&*" for c in password) else 0
     ])
-    char_entropy = len(password) * math.log2(char_types) if char_types > 0 else 0
+    standard = len(password) * math.log2(char_types) if char_types > 0 else 0
+    
     return {
-        'standard': word_entropy + char_entropy,
-        'combined': word_entropy * 0.7 + char_entropy * 0.3
+        'standard': standard,
+        'shannon': shannon,
+        'combined': 0.6 * standard + 0.4 * shannon
     }
 
 def check_password_strength(password: str, forbidden_context: List[str] = None) -> Dict:
@@ -130,12 +141,12 @@ def check_password_strength(password: str, forbidden_context: List[str] = None) 
     checks = [
         (len(set(password)) < 4, "Слишком много повторяющихся символов"),
         (any(password[i] == password[i+1] == password[i+2] for i in range(len(password)-2)),
-        "Три повторяющихся символа подряд"),
+         "Три повторяющихся символа подряд"),
         (bool(re.search(r'(.)\1{2}', password)), "Повторяющиеся паттерны"),
         (bool(re.search(r'\d{4,}', password)), "Последовательности цифр"),
         (bool(re.search(r'(19|20)\d{2}', password)), "Обнаружен год"),
         (bool(re.search(r'qwerty|12345|password|asdfgh|123456|111111', password.lower())),
-        "Обнаружен опасный паттерн")
+         "Обнаружен опасный паттерн")
     ]
 
     score = 4
@@ -150,7 +161,7 @@ def check_password_strength(password: str, forbidden_context: List[str] = None) 
 
     return {
         'strength': strength,
-        'entropy': {k: v for k, v in entropy.items()},
+        'entropy': entropy,
         'time_to_crack': time_to_crack,
         'warnings': warnings
     }
@@ -214,6 +225,22 @@ def handle_generate():
             'compromised': pwned
         })
     except Exception as e:
+        logger.error(f"Generation error: {str(e)}")
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/check', methods=['POST'])
+def handle_check():
+    try:
+        data = request.get_json()
+        password = data.get('password', '')
+        if not password:
+            raise ValueError("Пароль не может быть пустым")
+        
+        result = check_password_strength(password, data.get('forbidden_context', []))
+        result['compromised'] = is_password_pwned(password)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Check error: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 def is_password_pwned(password: str) -> bool:
@@ -221,8 +248,10 @@ def is_password_pwned(password: str) -> bool:
         sha1 = hashlib.sha1(password.encode()).hexdigest().upper()
         prefix, suffix = sha1[:5], sha1[5:]
         response = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}", timeout=3)
+        response.raise_for_status()
         return any(line.split(':')[0] == suffix for line in response.text.splitlines())
-    except Exception:
+    except Exception as e:
+        logger.error(f"Pwned check failed: {str(e)}")
         return False
 
 if __name__ == '__main__':
