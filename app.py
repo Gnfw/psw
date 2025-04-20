@@ -132,15 +132,16 @@ def check_password_strength(password: str, forbidden_context: List[str] = None) 
 
     score = sum([has_lower, has_upper, has_digit, has_special]) + min(3, len(password) // 12)
     
-    checks = [
-        (len(set(password)) < 4, "Слишком много повторяющихся символов"),
-        (any(password[i] == password[i+1] == password[i+2] for i in range(len(password)-2), "Три повторяющихся символа подряд"),
-        (re.search(r'(.)\1{2}', password), "Повторяющиеся паттерны"),
-        (re.search(r'\d{4,}', password), "Последовательности цифр"),
-        (re.search(r'(19|20)\d{2}', password), "Обнаружен год"),
-        (check_common_patterns(password), "Обнаружен опасный паттерн"),
-        (has_uniform_distribution(password), "Неравномерное распределение символов")
-    ]
+   checks = [
+            (len(set(password)) < 4, "Слишком много повторяющихся символов"),
+            (any(password[i] == password[i+1] == password[i+2] for i in range(len(password)-2)),
+             "Три повторяющихся символа подряд"),
+            (re.search(r'(.)\1{2}', password), "Повторяющиеся паттерны"),
+            (re.search(r'\d{4,}', password), "Последовательности цифр"),
+            (re.search(r'(19|20)\d{2}', password), "Обнаружен год"),
+            (check_common_patterns(password), "Обнаружен опасный паттерн"),
+            (has_uniform_distribution(password), "Неравномерное распределение символов")
+        ]
 
     for condition, warning in checks:
         if condition:
