@@ -34,8 +34,11 @@ DICTIONARY_URLS = {
     'russian': 'https://raw.githubusercontent.com/Harrix/Russian-Nouns/main/dist/russian_nouns.txt'
 }
 
-BACKUP_WORDS = ['apple', 'sun', 'moon', 'password', 'security', 'tree', 'flower', 'rocket', 'coffee', 'python',
-                'star', 'ocean', 'forest', 'mountain', 'light', 'shadow', 'fire', 'water', 'earth', 'air'] * 5
+BACKUP_WORDS = [
+    'apple', 'sun', 'moon', 'tree', 'flower', 'rocket', 'coffee', 'python', 'star', 'ocean',
+    'forest', 'mountain', 'light', 'shadow', 'fire', 'water', 'earth', 'air', 'castle', 'garden',
+    'computer', 'phone', 'window', 'door', 'book', 'pen', 'paper', 'music', 'art', 'science'
+] * 10
 
 @lru_cache(maxsize=1)
 def load_dictionaries() -> Set[str]:
@@ -55,55 +58,56 @@ def load_dictionaries() -> Set[str]:
 
 DICTIONARY = load_dictionaries()
 
-def generate_mnemonic_phrase(
-    length: int,
-    options: PasswordOptions,
-    separator: str = "-"
-) -> str:
+def generate_mnemonic_phrase(length: int, options: PasswordOptions, separator: str = "-") -> str:
     rng = secrets.SystemRandom()
     words = [w for w in DICTIONARY if 5 <= len(w) <= 8]
     if not words:
         words = BACKUP_WORDS
     
-    # Расчет количества слов
-    min_words = max(4, math.ceil(length / 8))
-    num_words = min(min_words + 2, 8)
-    
+    base_word_count = max(4, math.ceil(length / 7))
+    num_words = min(base_word_count + 2, 8)
     selected = rng.sample(words, num_words)
     
-    # Преобразование регистра
-    case_modes = []
+    case_functions = []
     if options & PasswordOptions.OPT_RANDOM_CASE:
-        case_modes = [str.lower, str.title, str.upper]
+        case_functions = [str.lower, str.title, str.upper]
     
     phrase = []
     for word in selected:
-        if case_modes:
-            word = rng.choice(case_modes)(word)
+        if case_functions:
+            word = rng.choice(case_functions)(word)
+        else:
+            word = word.lower()
         phrase.append(word)
         
-        # Обязательное добавление цифр/спецсимволов
         if options & PasswordOptions.OPT_DIGITS and rng.random() < 0.6:
             phrase.append(str(rng.randint(0, 9)))
+            
         if options & PasswordOptions.OPT_SPECIAL and rng.random() < 0.4:
             phrase.append(rng.choice("!@#$%&*"))
     
-    # Гарантированное наличие цифр/символов
     if options & PasswordOptions.OPT_DIGITS and not any(c.isdigit() for c in phrase):
-        phrase.insert(rng.randint(1, len(phrase)), str(rng.randint(0, 9)))
+        phrase.insert(rng.randint(1, len(phrase)), str(rng.randint(10, 99)))
+    
     if options & PasswordOptions.OPT_SPECIAL and not any(c in "!@#$%&*" for c in phrase):
         phrase.insert(rng.randint(1, len(phrase)), rng.choice("!@#$%&*"))
     
     return separator.join(phrase)[:length]
 
-def has_uniform_distribution(password: str, threshold: float = 0.25) -> bool:
-    counts = Counter(password)
-    max_freq = max(counts.values(), default=0)
-    return (max_freq / len(password)) > threshold
-
-def check_common_patterns(password: str) -> bool:
-    patterns = ['qwerty', '12345', 'password', 'asdfgh', '123456', '111111', 'abc123']
-    return any(p in password.lower() for p in patterns)
+def calculate_entropy(password: str) -> Dict:
+    components = re.split(r'\W+', password)
+    word_entropy = math.log2(len(DICTIONARY)) * sum(1 for w in components if w.lower() in DICTIONARY)
+    char_types = sum([
+        26 if any(c.islower() for c in password) else 0,
+        26 if any(c.isupper() for c in password) else 0,
+        10 if any(c.isdigit() for c in password) else 0,
+        32 if any(c in "!@#$%&*" for c in password) else 0
+    ])
+    char_entropy = len(password) * math.log2(char_types) if char_types > 0 else 0
+    return {
+        'standard': word_entropy + char_entropy,
+        'combined': word_entropy * 0.7 + char_entropy * 0.3
+    }
 
 def check_password_strength(password: str, forbidden_context: List[str] = None) -> Dict:
     warnings = []
@@ -123,27 +127,6 @@ def check_password_strength(password: str, forbidden_context: List[str] = None) 
     if any(word in clean_password.split() for word in DICTIONARY if len(word) >= 4):
         warnings.append("Обнаружено словарное слово")
 
-    has_lower = any(c.islower() for c in password)
-    has_upper = any(c.isupper() for c in password)
-    has_digit = any(c.isdigit() for c in password)
-    has_special = any(c in "!@#$%^&*()_+~`|}{[]\\:;\"'<>?,./-=" for c in password)
-
-    char_set_size = sum([
-        26 if has_lower else 0,
-        26 if has_upper else 0,
-        10 if has_digit else 0,
-        32 if has_special else 0
-    ]) or 1
-
-    standard_entropy = len(password) * math.log2(char_set_size)
-    freq = Counter(password)
-    probs = [count/len(password) for count in freq.values()]
-    shannon_entropy = -sum(p * math.log2(p) for p in probs) * len(password) if len(password) > 0 else 0
-    effective_entropy = 0.7 * standard_entropy + 0.3 * shannon_entropy
-    time_to_crack = (2 ** effective_entropy) / 1e10
-
-    score = sum([has_lower, has_upper, has_digit, has_special]) + min(3, len(password) // 12)
-    
     checks = [
         (len(set(password)) < 4, "Слишком много повторяющихся символов"),
         (any(password[i] == password[i+1] == password[i+2] for i in range(len(password)-2)),
@@ -151,57 +134,41 @@ def check_password_strength(password: str, forbidden_context: List[str] = None) 
         (bool(re.search(r'(.)\1{2}', password)), "Повторяющиеся паттерны"),
         (bool(re.search(r'\d{4,}', password)), "Последовательности цифр"),
         (bool(re.search(r'(19|20)\d{2}', password)), "Обнаружен год"),
-        (check_common_patterns(password), "Обнаружен опасный паттерн"),
-        (has_uniform_distribution(password), "Неравномерное распределение символов")
+        (bool(re.search(r'qwerty|12345|password|asdfgh|123456|111111', password.lower())),
+        "Обнаружен опасный паттерн")
     ]
 
+    score = 4
     for condition, warning in checks:
         if condition:
             warnings.append(warning)
             score -= 1
 
-    strength = min(max(math.ceil(score / 2), 1), 5)
+    entropy = calculate_entropy(password)
+    time_to_crack = (2 ** entropy['combined']) / 1e10
+    strength = min(max(math.ceil(entropy['combined'] / 20), 1), 5)
 
     return {
         'strength': strength,
-        'entropy': {
-            'standard': standard_entropy,
-            'shannon': shannon_entropy,
-            'combined': effective_entropy
-        },
+        'entropy': {k: v for k, v in entropy.items()},
         'time_to_crack': time_to_crack,
         'warnings': warnings
     }
 
-def generate_password_with_options(
-    length: int,
-    options: PasswordOptions,
-    separator: str = "-",
-    custom_charset: str = ""
-) -> str:
+def generate_password_with_options(length: int, options: PasswordOptions, custom_charset: str = "") -> str:
     if options & PasswordOptions.OPT_MNEMONIC:
-        return generate_mnemonic_phrase(
-            length=length,
-            separator=separator,
-            add_number=bool(options & PasswordOptions.OPT_DIGITS),
-            add_special=bool(options & PasswordOptions.OPT_SPECIAL)
-        )
+        return generate_mnemonic_phrase(length, options)
     
-    charset = ""
-    if options & PasswordOptions.OPT_CUSTOM_CHARSET:
-        charset = custom_charset
-        if len(set(charset)) < 4:
-            raise ValueError("Набор символов должен содержать минимум 4 уникальных символа")
-    else:
+    charset = custom_charset if options & PasswordOptions.OPT_CUSTOM_CHARSET else ""
+    if not charset:
         if options & PasswordOptions.OPT_LOWERCASE:
             charset += string.ascii_lowercase
         if options & PasswordOptions.OPT_UPPERCASE:
             charset += string.ascii_uppercase
-        if options & PasswordOptions.OPT_DIGITS and not (options & PasswordOptions.OPT_NO_DIGITS):
+        if options & PasswordOptions.OPT_DIGITS and not options & PasswordOptions.OPT_NO_DIGITS:
             charset += string.digits
         if options & PasswordOptions.OPT_SPECIAL:
             charset += "!@#$%^&*()_+"
-        
         if options & PasswordOptions.OPT_AVOID_SIMILAR:
             charset = ''.join(c for c in charset if c not in 'lI10Oo')
     
@@ -212,9 +179,6 @@ def generate_password_with_options(
     
     if options & PasswordOptions.OPT_SEPARATORS:
         password = '-'.join([password[i:i+4] for i in range(0, len(password), 4)])
-    
-    if options & PasswordOptions.OPT_NO_REPEAT_CHARS:
-        password = ''.join(dict.fromkeys(password))
     
     return password[:length]
 
@@ -235,7 +199,6 @@ def handle_generate():
         password = generate_password_with_options(
             length=length,
             options=PasswordOptions(options),
-            separator=data.get('separator', '-'),
             custom_charset=data.get('custom_charset', '')
         )
         
@@ -250,17 +213,6 @@ def handle_generate():
             'warnings': result['warnings'],
             'compromised': pwned
         })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
-
-@app.route('/check', methods=['POST'])
-def handle_check():
-    try:
-        data = request.get_json()
-        password = data.get('password', '')
-        result = check_password_strength(password, data.get('forbidden_context', []))
-        result['compromised'] = is_password_pwned(password)
-        return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
