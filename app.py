@@ -134,7 +134,7 @@ def check_password_strength(password: str, forbidden_context: List[str] = None) 
     
     checks = [
         (len(set(password)) < 4, "Слишком много повторяющихся символов"),
-        (any(password[i] == password[i+1] == password[i+2] for i in range(len(password)-2)),
+        (any(password[i] == password[i+1] == password[i+2] for i in range(len(password)-2))),
         (re.search(r'(.)\1{2}', password), "Повторяющиеся паттерны"),
         (re.search(r'\d{4,}', password), "Последовательности цифр"),
         (re.search(r'(19|20)\d{2}', password), "Обнаружен год"),
