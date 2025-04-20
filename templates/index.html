@@ -47,11 +47,6 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-
-        .tooltip:hover .tooltip-text {
-            opacity: 1;
-            visibility: visible;
-        }
     </style>
 </head>
 <body data-theme="light" class="min-h-screen">
@@ -75,9 +70,7 @@
         <div class="bg-gray-100 dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
             <!-- Generator Section -->
             <section class="mb-8">
-                <h2 class="text-xl font-semibold mb-4 flex items-center">
-                    🔐 Генерация пароля
-                </h2>
+                <h2 class="text-xl font-semibold mb-4">🔐 Генерация пароля</h2>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Controls -->
@@ -88,24 +81,19 @@
                                    class="w-full bg-white dark:bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                         </div>
 
-                        <div class="space-y-2">
-                            <label class="block text-sm mb-2">Настройки:</label>
-                            <div class="grid grid-cols-2 gap-2" id="options-container">
-                                <!-- Options will be populated dynamically -->
-                            </div>
+                        <div>
+                            <label class="block text-sm mb-2">Язык словаря</label>
+                            <select id="lang-select" class="w-full bg-white dark:bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="english">English</option>
+                                <option value="russian">Русский</option>
+                                <option value="both">Оба языка</option>
+                            </select>
                         </div>
 
                         <div class="space-y-2">
-                            <label class="block text-sm mb-2">Языки:</label>
-                            <div class="flex gap-4">
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="lang" value="english" checked 
-                                           class="form-checkbox text-blue-500"> English
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="lang" value="russian" 
-                                           class="form-checkbox text-blue-500"> Русский
-                                </label>
+                            <label class="block text-sm mb-2">Настройки:</label>
+                            <div class="grid grid-cols-1 gap-2" id="options-container">
+                                <!-- Options will be populated dynamically -->
                             </div>
                         </div>
 
@@ -129,15 +117,34 @@
                             </button>
                         </div>
 
-                        <div class="mb-4">
-                            <canvas id="entropy-chart"></canvas>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span>Стандартная энтропия:</span>
+                                <span id="entropy-standard"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Энтропия Шеннона:</span>
+                                <span id="entropy-shannon"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Комбинированная оценка:</span>
+                                <span id="entropy-combined"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Время взлома:</span>
+                                <span id="crack-time"></span>
+                            </div>
+                            <div class="flex justify-between font-semibold">
+                                <span>Уровень безопасности:</span>
+                                <span id="security-level"></span>
+                            </div>
                         </div>
 
-                        <div id="warnings" class="space-y-2 text-sm"></div>
-                        <div id="time-info" class="mt-4 text-sm text-gray-600 dark:text-gray-400"></div>
-                        <div id="pwned-warning" class="mt-2 text-red-600 dark:text-red-400 hidden">
-                            ⚠️ Этот пароль найден в утечках данных!
+                        <div id="pwned-warning" class="mt-4 p-2 rounded-lg bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 hidden">
+                            ⚠️ Пароль найден в утечках данных!
                         </div>
+
+                        <div id="warnings" class="mt-4 space-y-2"></div>
                     </div>
                 </div>
             </section>
@@ -153,7 +160,7 @@
                         Проверить
                     </button>
                 </div>
-                <div id="check-results" class="mt-4"></div>
+                <div id="check-results" class="mt-4 space-y-2"></div>
             </section>
 
             <!-- History Section -->
@@ -167,26 +174,23 @@
     </div>
 
     <script>
-        let chart = null;
-        let history = JSON.parse(localStorage.getItem('passwordHistory') || [];
         const optionsConfig = [
-            { id: 'OPT_LOWERCASE', label: 'Строчные буквы', tooltip: 'Включает строчные буквы (a-z, а-я)' },
-            { id: 'OPT_UPPERCASE', label: 'Заглавные буквы', tooltip: 'Включает заглавные буквы (A-Z, А-Я)' },
-            { id: 'OPT_DIGITS', label: 'Цифры', tooltip: 'Добавляет цифры 0-9' },
-            { id: 'OPT_SPECIAL', label: 'Спецсимволы', tooltip: 'Добавляет !@#$%^&*()_+' },
-            { id: 'OPT_NO_DIGITS', label: 'Без цифр', tooltip: 'Исключает все цифры' },
-            { id: 'OPT_SEPARATORS', label: 'Разделители', tooltip: 'Добавляет дефисы между группами символов' },
-            { id: 'OPT_AVOID_SIMILAR', label: 'Исключить похожие', tooltip: 'Исключает символы типа 1, l, I, 0, O' },
-            { id: 'OPT_NO_REPEAT', label: 'Без повторов', tooltip: 'Исключает повторяющиеся символы' },
-            { id: 'OPT_RANDOM_CASE', label: 'Случайный регистр', tooltip: 'Случайно меняет регистр букв' },
-            { id: 'OPT_MNEMONIC', label: 'Мнемоническая фраза', tooltip: 'Генерирует легко запоминающуюся фразу' },
-            { id: 'OPT_UNICODE', label: 'Юникод символы', tooltip: 'Добавляет специальные символы ★☺♫ и другие' },
+            { id: 'OPT_LOWERCASE', label: 'Строчные буквы' },
+            { id: 'OPT_UPPERCASE', label: 'Прописные буквы' },
+            { id: 'OPT_DIGITS', label: 'Цифры' },
+            { id: 'OPT_SPECIAL', label: 'Спецсимволы' },
+            { id: 'OPT_RANDOM_CASE', label: 'Случайный регистр' },
+            { id: 'OPT_SEPARATORS', label: 'Разделители' },
+            { id: 'OPT_AVOID_SIMILAR', label: 'Исключить похожие' },
+            { id: 'OPT_UNICODE', label: 'Unicode символы' },
+            { id: 'OPT_MNEMONIC', label: 'Мнемоническая фраза' }
         ];
+
+        let history = JSON.parse(localStorage.getItem('passwordHistory') || '[]');
 
         // Инициализация
         function init() {
             initOptions();
-            initChart();
             renderHistory();
             loadTheme();
         }
@@ -195,12 +199,9 @@
         function initOptions() {
             const container = document.getElementById('options-container');
             container.innerHTML = optionsConfig.map(opt => `
-                <label class="flex items-center space-x-2 tooltip">
+                <label class="flex items-center space-x-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
                     <input type="checkbox" class="form-checkbox text-blue-500" option="${opt.id}">
                     <span>${opt.label}</span>
-                    <span class="tooltip-text absolute z-10 invisible opacity-0 bg-gray-800 text-white text-xs px-2 py-1 rounded-lg mt-8 transition-opacity">
-                        ${opt.tooltip}
-                    </span>
                 </label>
             `).join('');
         }
@@ -217,39 +218,10 @@
             localStorage.setItem('theme', newTheme);
         }
 
-        // Инициализация графика
-        function initChart() {
-            const ctx = document.getElementById('entropy-chart').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Энтропия'],
-                    datasets: [{
-                        label: 'Уровень энтропии',
-                        backgroundColor: '#3b82f6',
-                        borderColor: '#2563eb',
-                        borderWidth: 1,
-                        data: [0]
-                    }]
-                },
-                options: {
-                    scales: { y: { beginAtZero: true } },
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-        }
-
-        // Обновление графика
-        function updateChart(entropy) {
-            chart.data.datasets[0].data = [entropy];
-            chart.update();
-        }
-
         // История генераций
-        function updateHistory(password, data) {
+        function updateHistory(data) {
             history.unshift({
-                password,
+                password: data.password,
                 strength: data.strength,
                 entropy: data.entropy,
                 time: data.time_to_crack,
@@ -262,7 +234,7 @@
 
         function renderHistory() {
             const container = document.getElementById('history');
-            container.innerHTML = history.map((item, index) => `
+            container.innerHTML = history.map(item => `
                 <div class="fade-in p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
                      onclick="document.getElementById('password-check').value = '${item.password}'; checkPassword()">
                     <div class="flex justify-between items-center">
@@ -272,31 +244,10 @@
                                       ${item.strength > 3 ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900'}">
                                 ${item.strength}/5
                             </span>
-                            <span class="text-xs text-gray-500">${Math.round(item.time)} сек</span>
                         </div>
                     </div>
                 </div>
             `).join('');
-        }
-
-        // Экспорт истории
-        async function exportHistory() {
-            if (history.length === 0) return alert('История пуста!');
-            
-            const password = prompt('Введите пароль для шифрования:');
-            if (!password) return;
-
-            try {
-                const encrypted = CryptoJS.AES.encrypt(
-                    JSON.stringify(history),
-                    password
-                ).toString();
-
-                const blob = new Blob([encrypted], { type: 'text/plain;charset=utf-8' });
-                saveAs(blob, 'passwords_export.enc');
-            } catch (error) {
-                alert('Ошибка при экспорте: ' + error.message);
-            }
         }
 
         // Генерация пароля
@@ -304,6 +255,12 @@
             try {
                 toggleLoading(true);
                 
+                const langs = {
+                    'english': ['english'],
+                    'russian': ['russian'],
+                    'both': ['english', 'russian']
+                }[document.getElementById('lang-select').value];
+
                 const response = await fetch('/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -311,16 +268,15 @@
                         length: parseInt(document.getElementById('length').value),
                         options: Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
                                     .map(el => el.getAttribute('option')),
-                        langs: Array.from(document.querySelectorAll('input[name="lang"]:checked'))
-                                    .map(el => el.value)
+                        langs: langs
                     })
                 });
 
                 if (!response.ok) throw new Error(await response.text());
                 
                 const data = await response.json();
-                showResult(data);
-                updateHistory(data.password, data);
+                showGenerationResult(data);
+                updateHistory(data);
                 
             } catch (error) {
                 showError(error.message);
@@ -346,7 +302,7 @@
                 if (!response.ok) throw new Error(await response.text());
                 
                 const data = await response.json();
-                showCheckResults(data);
+                showCheckResult(data);
                 
             } catch (error) {
                 showError(error.message);
@@ -355,13 +311,17 @@
             }
         }
 
-        // Отображение результатов
-        function showResult(data) {
+        // Отображение результатов генерации
+        function showGenerationResult(data) {
             document.getElementById('password-result').value = data.password;
-            document.getElementById('pwned-warning').classList.toggle('hidden', !data.compromised);
-            document.getElementById('time-info').textContent = `Примерное время взлома: ${data.time_to_crack} секунд`;
             
-            updateChart(data.entropy.combined);
+            document.getElementById('entropy-standard').textContent = `${data.entropy.standard.toFixed(2)} бит`;
+            document.getElementById('entropy-shannon').textContent = `${data.entropy.shannon.toFixed(2)} бит`;
+            document.getElementById('entropy-combined').textContent = `${data.entropy.combined.toFixed(2)} бит`;
+            document.getElementById('crack-time').textContent = formatTime(data.time_to_crack);
+            document.getElementById('security-level').textContent = getSecurityLevel(data.strength);
+            
+            document.getElementById('pwned-warning').classList.toggle('hidden', !data.compromised);
             
             document.getElementById('warnings').innerHTML = data.warnings.map(w => `
                 <div class="fade-in p-2 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded-lg">
@@ -370,23 +330,39 @@
             `).join('');
         }
 
-        function showCheckResults(data) {
+        // Отображение результатов проверки
+        function showCheckResult(data) {
             const results = document.getElementById('check-results');
             results.innerHTML = `
                 <div class="fade-in p-4 rounded-lg ${data.compromised ? 'bg-red-100 dark:bg-red-900' : 'bg-green-100 dark:bg-green-900'}">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="font-semibold">Надёжность: ${data.strength}/5</h3>
-                            <p>Энтропия: ${data.entropy.combined.toFixed(2)} бит</p>
-                            <p>Время взлома: ${data.time_to_crack.toFixed(2)} сек</p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <div>Стандартная энтропия:</div>
+                            <div>${data.entropy.standard.toFixed(2)} бит</div>
                         </div>
-                        ${data.compromised ? 
-                            '<span class="text-2xl">⚠️</span>' : 
-                            '<span class="text-2xl">✅</span>'}
+                        <div class="space-y-1">
+                            <div>Энтропия Шеннона:</div>
+                            <div>${data.entropy.shannon.toFixed(2)} бит</div>
+                        </div>
+                        <div class="space-y-1">
+                            <div>Комбинированная оценка:</div>
+                            <div>${data.entropy.combined.toFixed(2)} бит</div>
+                        </div>
+                        <div class="space-y-1">
+                            <div>Время взлома:</div>
+                            <div>${formatTime(data.time_to_crack)}</div>
+                        </div>
                     </div>
+                    <div class="mt-4 font-semibold">
+                        Уровень безопасности: ${getSecurityLevel(data.strength)}
+                    </div>
+                    ${data.compromised ? 
+                        '<div class="mt-2 text-red-600">⚠️ Пароль найден в утечках данных!</div>' : 
+                        '<div class="mt-2 text-green-600">✅ Пароль безопасен</div>'}
                     ${data.warnings.length ? `
                         <div class="mt-4">
-                            ${data.warnings.map(w => `<p class="text-sm">⚠️ ${w}</p>`).join('')}
+                            <div class="font-semibold">Проблемы с паролем:</div>
+                            ${data.warnings.map(w => `<div class="text-sm">⚠️ ${w}</div>`).join('')}
                         </div>
                     ` : ''}
                 </div>
@@ -394,6 +370,33 @@
         }
 
         // Вспомогательные функции
+        function formatTime(seconds) {
+            if (seconds > 31536000000000) return `${Math.round(seconds / 31536000000000)} веков`;
+            const units = [
+                { value: 31536000, label: 'лет' },
+                { value: 86400, label: 'дней' },
+                { value: 3600, label: 'часов' },
+            ];
+            
+            for (const unit of units) {
+                if (seconds >= unit.value) {
+                    return `~${Math.round(seconds / unit.value)} ${unit.label}`;
+                }
+            }
+            return `${Math.round(seconds)} сек`;
+        }
+
+        function getSecurityLevel(strength) {
+            const levels = [
+                'Очень слабый',
+                'Слабый',
+                'Средний',
+                'Сильный',
+                'Очень сильный'
+            ];
+            return levels[strength - 1] || 'Неизвестно';
+        }
+
         function toggleLoading(state) {
             document.getElementById('preloader').classList.toggle('hidden', !state);
             document.getElementById('generate-text').classList.toggle('opacity-0', state);
