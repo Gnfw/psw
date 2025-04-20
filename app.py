@@ -28,17 +28,17 @@ class PasswordOptions(IntFlag):
     OPT_CUSTOM_CHARSET = 1 << 9
     OPT_MNEMONIC = 1 << 10
     OPT_NO_REPEAT_CHARS = 1 << 11
-    OPT_RUSSIAN = 1 << 12
-    OPT_UNICODE = 1 << 13
+    OPT_UNICODE = 1 << 12
 
 DICTIONARY_URLS = {
     'english': 'https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt',
     'russian': 'https://raw.githubusercontent.com/Harrix/Russian-Nouns/main/dist/russian_nouns.txt'
 }
 
+RUSSIAN_LETTERS = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя'
 BACKUP_WORDS = {
-    'english': ['apple', 'sun', 'moon', 'tree', 'flower', 'rocket', 'coffee'],
-    'russian': ['яблоко', 'солнце', 'луна', 'дерево', 'цветок', 'ракета', 'кофе']
+    'english': ['apple', 'sun', 'moon', 'tree', 'flower'],
+    'russian': ['солнце', 'луна', 'дерево', 'цветок', 'кофе']
 }
 
 UNICODE_CHARS = "★☺♫♪♣♠♥♦✓✔✗✘∞≈≠≤≥±−×÷←↑→↓↔↕↨∂∅∆∈∏∑√∛∜∩∪∧∨¬≡≢⌈⌉⌊⌋◊"
@@ -55,16 +55,17 @@ def load_dictionary(lang: str) -> Set[str]:
         }
         all_words.update(words)
     except Exception as e:
-        logger.error(f"Ошибка загрузки словаря {lang}: {e}")
+        logger.error(f"Dictionary error ({lang}): {e}")
     return all_words
 
-def generate_mnemonic_phrase(length: int, options: PasswordOptions, lang: str, separator: str = "-") -> str:
+def generate_mnemonic_phrase(length: int, options: PasswordOptions, langs: List[str]) -> str:
     rng = secrets.SystemRandom()
-    dictionary = load_dictionary(lang)
-    words = [w for w in dictionary if 4 <= len(w) <= 8]
+    words = []
+    for lang in langs:
+        words.extend(load_dictionary(lang))
     
     if not words:
-        words = BACKUP_WORDS.get(lang, [])
+        words = [w for lang in langs for w in BACKUP_WORDS.get(lang, [])]
     
     base_word_count = max(4, math.ceil(length / 7))
     num_words = min(base_word_count + 2, 8)
@@ -85,13 +86,7 @@ def generate_mnemonic_phrase(length: int, options: PasswordOptions, lang: str, s
         if options & PasswordOptions.OPT_SPECIAL and rng.random() < 0.4:
             phrase.append(rng.choice("!@#$%&*"))
     
-    if options & PasswordOptions.OPT_DIGITS and not any(c.isdigit() for c in phrase):
-        phrase.insert(rng.randint(1, len(phrase)), str(rng.randint(10, 99)))
-    
-    if options & PasswordOptions.OPT_SPECIAL and not any(c in "!@#$%&*" for c in phrase):
-        phrase.insert(rng.randint(1, len(phrase)), rng.choice("!@#$%&*"))
-    
-    return separator.join(phrase)[:length]
+    return '-'.join(phrase)[:length]
 
 REPLACEMENTS = {
     'o': '0',
@@ -114,32 +109,31 @@ def reverse_replacements(word: str) -> List[str]:
         variants += new_vars
     return list(set(variants))
 
-def check_password_strength(password: str, forbidden_context: List[str] = None, options: PasswordOptions = None) -> Dict:
+def check_password_strength(password: str, options: PasswordOptions, langs: List[str]) -> Dict:
     warnings = []
-    forbidden_context = forbidden_context or []
-    options = options or PasswordOptions(0)
     
-    if forbidden_context:
-        context_pattern = re.compile(r'\b(' + '|'.join(map(re.escape, forbidden_context)) + r')\b', re.I)
-        if context_pattern.search(password):
-            warnings.append("Пароль содержит контекстно-зависимые данные")
-
     if len(password) < 12:
         warnings.append("Пароль слишком короткий (минимум 12 символов)")
     elif len(password) > 100:
         warnings.append("Пароль слишком длинный (максимум 100 символов)")
 
-    clean_password = re.sub(r'[^\w]', ' ', password.lower())
+    # Проверка словарных слов
+    clean_password = re.sub(r'[\W_]+', ' ', password.lower())
     words = clean_password.split()
     
-    for word in words:
-        variants = reverse_replacements(word)
-        if any(variant in load_dictionary('english') for variant in variants):
-            warnings.append("Обнаружено английское слово с заменой символов")
-        if options & PasswordOptions.OPT_RUSSIAN:
-            if any(variant in load_dictionary('russian') for variant in variants):
-                warnings.append("Обнаружено русское слово с заменой символов")
+    for lang in langs:
+        dictionary = load_dictionary(lang)
+        for word in words:
+            # Прямое совпадение
+            if word in dictionary:
+                warnings.append(f"Обнаружено {lang} слово")
+            
+            # Проверка замен
+            variants = reverse_replacements(word)
+            if any(variant in dictionary for variant in variants):
+                warnings.append(f"Обнаружено {lang} слово с заменой символов")
 
+    # Остальные проверки
     checks = [
         (len(set(password)) < 4, "Слишком много повторяющихся символов"),
         (any(password[i] == password[i+1] == password[i+2] for i in range(len(password)-2)),
@@ -178,6 +172,7 @@ def calculate_entropy(password: str) -> Dict:
         26 if any(c.isupper() for c in password) else 0,
         10 if any(c.isdigit() for c in password) else 0,
         32 if any(c in "!@#$%&*" for c in password) else 0,
+        len(RUSSIAN_LETTERS) if any(c.lower() in RUSSIAN_LETTERS for c in password) else 0,
         128 if any(ord(c) > 127 for c in password) else 0
     ])
     standard = len(password) * math.log2(char_types) if char_types > 0 else 0
@@ -191,18 +186,23 @@ def calculate_entropy(password: str) -> Dict:
 def generate_password_with_options(
     length: int,
     options: PasswordOptions,
-    custom_charset: str = "",
-    lang: str = "english"
+    langs: List[str],
+    custom_charset: str = ""
 ) -> str:
     if options & PasswordOptions.OPT_MNEMONIC:
-        return generate_mnemonic_phrase(length, options, lang)
+        return generate_mnemonic_phrase(length, options, langs)
     
     charset = custom_charset if options & PasswordOptions.OPT_CUSTOM_CHARSET else ""
     if not charset:
+        # Базовые символы
         if options & PasswordOptions.OPT_LOWERCASE:
             charset += string.ascii_lowercase
+            if 'russian' in langs:
+                charset += RUSSIAN_LETTERS
         if options & PasswordOptions.OPT_UPPERCASE:
             charset += string.ascii_uppercase
+            if 'russian' in langs:
+                charset += RUSSIAN_LETTERS.upper()
         if options & PasswordOptions.OPT_DIGITS and not options & PasswordOptions.OPT_NO_DIGITS:
             charset += string.digits
         if options & PasswordOptions.OPT_SPECIAL:
@@ -213,7 +213,10 @@ def generate_password_with_options(
             charset = ''.join(c for c in charset if c not in 'lI10Oo')
     
     if not charset:
-        raise ValueError("Не удалось создать набор символов")
+        raise ValueError("Не удалось создать набор символов. Проверьте настройки.")
+    
+    # Убираем дубликаты
+    charset = ''.join(set(charset))
     
     password = ''.join(secrets.choice(charset) for _ in range(length))
     
@@ -232,7 +235,7 @@ def handle_generate():
         data = request.get_json()
         length = int(data.get('length', 16))
         options = sum(getattr(PasswordOptions, opt) for opt in data.get('options', []))
-        lang = data.get('lang', 'english')
+        langs = data.get('langs', ['english'])
         custom_charset = data.get('custom_charset', '')
         
         if (options & PasswordOptions.OPT_DIGITS) and (options & PasswordOptions.OPT_NO_DIGITS):
@@ -241,11 +244,11 @@ def handle_generate():
         password = generate_password_with_options(
             length=length,
             options=PasswordOptions(options),
-            custom_charset=custom_charset,
-            lang=lang
+            langs=langs,
+            custom_charset=custom_charset
         )
         
-        result = check_password_strength(password, data.get('forbidden_context', []), PasswordOptions(options))
+        result = check_password_strength(password, PasswordOptions(options), langs)
         pwned = is_password_pwned(password)
         
         return jsonify({
@@ -268,7 +271,7 @@ def handle_check():
         if not password:
             raise ValueError("Пароль не может быть пустым")
         
-        result = check_password_strength(password, data.get('forbidden_context', []))
+        result = check_password_strength(password, PasswordOptions(0), ['english', 'russian'])
         result['compromised'] = is_password_pwned(password)
         return jsonify(result)
     except Exception as e:
