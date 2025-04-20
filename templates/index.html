@@ -270,24 +270,19 @@
             bar.style.background = colors[Math.min(strength-1, 2)];
         }
 
-        function toggleMnemonicOptions() {
-            const isMnemonic = document.querySelector('input[name="option"][value="OPT_MNEMONIC"]').checked;
-            const options = document.querySelectorAll('input[name="option"]:not([value="OPT_MNEMONIC"])');
-            const forbiddenContext = document.getElementById('forbiddenContext');
-            const customCharset = document.getElementById('customCharset');
-            
-            options.forEach(opt => {
-                opt.disabled = isMnemonic;
-                if(isMnemonic) opt.checked = false;
-            });
-            
-            forbiddenContext.disabled = isMnemonic;
-            customCharset.disabled = isMnemonic;
-            if(isMnemonic) {
-                customCharset.value = '';
-                useCustomCharset = false;
-            }
+       function toggleMnemonicOptions() {
+    const isMnemonic = document.querySelector('input[name="option"][value="OPT_MNEMONIC"]').checked;
+    // Разблокируем нужные опции
+    const allowedWithMnemonic = ['OPT_DIGITS', 'OPT_SPECIAL', 'OPT_RANDOM_CASE'];
+    document.querySelectorAll('input[name="option"]').forEach(opt => {
+        if (allowedWithMnemonic.includes(opt.value)) {
+            opt.disabled = isMnemonic ? false : opt.disabled;
+        } else {
+            opt.disabled = isMnemonic;
+            if(isMnemonic) opt.checked = false;
         }
+    });
+}
 
         function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
