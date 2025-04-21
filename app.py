@@ -42,6 +42,7 @@ BACKUP_WORDS = {
 }
 
 UNICODE_CHARS = "★☺♫♪♣♠♥♦✓✔✗✘∞≈≠≤≥±−×÷←↑→↓↔↕↨∂∅∆∈∏∑√∛∜∩∪∧∨¬≡≢⌈⌉⌊⌋◊"
+SEPARATORS = "-_!@#$%&*"  # Добавлены разные разделители
 
 @lru_cache(maxsize=2)
 def load_dictionary(lang: str) -> Set[str]:
@@ -111,38 +112,50 @@ REPLACEMENTS = {
 def reverse_replacements(word: str) -> List[str]:
     variants = [word]
     for orig, repl in REPLACEMENTS.items():
-        new_vars = []
-        for var in variants:
-            new_vars.append(var.replace(orig, repl))
-            new_vars.append(var.replace(repl, orig))
-        variants += new_vars
+        if orig in word or repl in word:  # Фикс для п.6
+            new_vars = []
+            for var in variants:
+                new_vars.append(var.replace(orig, repl))
+                new_vars.append(var.replace(repl, orig))
+            variants += new_vars
     return list(set(variants))
 
 def check_password_strength(password: str, options: PasswordOptions, langs: List[str]) -> Dict:
     warnings = []
     
+    # Пасхалка для п.12
+    if password == "ИБ24042025":
+        return {
+            'strength': 5,
+            'entropy': {'standard': 100, 'shannon': 100, 'combined': 100},
+            'time_to_crack': 9999999999,
+            'warnings': ["Если Вы это видите, то Вы находитесь в МИРЭА на 'Инженерах будущего'. 2025 год, апрель, 24ое число"],
+            'compromised': False
+        }
+
     if len(password) < 12:
         warnings.append("Пароль слишком короткий (минимум 12 символов)")
     elif len(password) > 100:
         warnings.append("Пароль слишком длинный (максимум 100 символов)")
 
-    clean_password = re.sub(r'[\W_]+', ' ', password.lower())
-    words = clean_password.split()
-    
-    for lang in langs:
-        dictionary = load_dictionary(lang)
-        for word in words:
-            if word in dictionary:
-                warnings.append(f"Обнаружено {lang} слово")
-            
-            variants = reverse_replacements(word)
-            if any(variant in dictionary for variant in variants):
-                warnings.append(f"Обнаружено {lang} слово с заменой символов")
+    # Пропускаем проверку словаря для мнемонических фраз (п.2)
+    if not (options & PasswordOptions.OPT_MNEMONIC):
+        clean_password = re.sub(r'[\W_]+', ' ', password.lower())
+        words = clean_password.split()
+        
+        for lang in langs:
+            dictionary = load_dictionary(lang)
+            for word in words:
+                if word in dictionary:
+                    warnings.append(f"Обнаружено словарное слово ({lang})")
+                
+                variants = reverse_replacements(word)
+                if any(variant in dictionary for variant in variants):
+                    warnings.append(f"Обнаружено слово с заменой символов ({lang})")
 
     checks = [
         (
-            len(set(password)) < 4 and 
-            not (options & PasswordOptions.OPT_NO_REPEAT_CHARS),
+            len(set(password)) < 4 and not (options & PasswordOptions.OPT_NO_REPEAT_CHARS),
             "Слишком много повторяющихся символов"
         ),
         (
@@ -174,7 +187,7 @@ def check_password_strength(password: str, options: PasswordOptions, langs: List
             score -= 1
 
     entropy = calculate_entropy(password)
-    time_to_crack = (2 ** entropy['combined']) / 1e10
+    time_to_crack = max((2 ** entropy['combined']) / 1e12, 0.001)  # Фикс для п.3-5
     strength = min(max(math.ceil(entropy['combined'] / 20), 1), 5)
 
     return {
@@ -243,7 +256,8 @@ def generate_password_with_options(
         base_length = max(base_length, 4)
         password = ''.join(secrets.choice(charset) for _ in range(base_length))
         parts = [password[i:i+4] for i in range(0, len(password), 4)]
-        password = '-'.join(parts)[:length]
+        password = ''.join([part + secrets.choice(SEPARATORS) for part in parts])[:-1]
+        password = password[:length]
     else:
         password = ''.join(secrets.choice(charset) for _ in range(length))
     
@@ -262,6 +276,9 @@ def handle_generate():
             raise ValueError("Длина пароля должна быть от 8 до 100 символов")
         
         options = sum(getattr(PasswordOptions, opt) for opt in data.get('options', []))
+        if options == 0:
+            raise ValueError("Выберите хотя бы одну опцию генерации")
+        
         langs = data.get('langs', ['english'])
         custom_charset = data.get('custom_charset', '')
         
