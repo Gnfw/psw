@@ -52,6 +52,15 @@
             background: #2d2f36;
             color: white;
         }
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -111,7 +120,7 @@
                                    class="flex-1 bg-transparent text-xl font-mono">
                             <button onclick="copyPassword()" class="ml-2 p-2 hover:bg-gray-200 rounded-lg tooltip">
                                 📋
-                                <span class="tooltip-text">Скопировать пароль</span>
+                                <span class="tooltip-text bg-gray-800 text-white px-2 py-1 rounded text-sm absolute mt-2">Скопировать</span>
                             </button>
                         </div>
                         <div class="space-y-2 text-sm">
@@ -253,6 +262,8 @@
             document.getElementById('warnings').innerHTML = data.warnings.map(w => `
                 <div class="p-2 rounded-lg warning">⚠️ ${w}</div>
             `).join('');
+
+            document.querySelector('.result-box').scrollIntoView({ behavior: 'smooth' });
         }
 
         function showCheckResult(data) {
