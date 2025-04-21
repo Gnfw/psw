@@ -139,18 +139,41 @@ def check_password_strength(password: str, options: PasswordOptions, langs: List
         warnings.append("Пароль слишком длинный (максимум 100 символов)")
 
     if not (options & PasswordOptions.OPT_MNEMONIC):
-        clean_password = re.sub(r'[^\w]', ' ', password.lower())
-        words = re.findall(r'\b\w+\b', clean_password)
+       clean_password = re.sub(r'[\W_]', ' ', password.lower())
+        words = re.findall(r'\b[a-zа-яё]{3,}\b', clean_password)
         
         for lang in langs:
             dictionary = load_dictionary(lang)
             for word in words:
+                # Прямое совпадение
                 if word in dictionary:
-                    warnings.append(f"Обнаружено словарное слово ({lang})")
+                    warnings.append(f"Словарное слово ({lang}): '{word}'")
                 
-                variants = reverse_replacements(word)
-                if any(variant in dictionary for variant in variants):
-                    warnings.append(f"Обнаружено слово с заменой символов ({lang})")
+                # Глубокий поиск замен
+                variants = set()
+                stack = [word]
+                seen = set()
+                
+                while stack:
+                    current = stack.pop()
+                    if current in seen:
+                        continue
+                    seen.add(current)
+                    
+                    for orig, repl in REPLACEMENTS.items():
+                        if orig in current:
+                            new_var = current.replace(orig, repl)
+                            variants.add(new_var)
+                            stack.append(new_var)
+                        if repl in current:
+                            new_var = current.replace(repl, orig)
+                            variants.add(new_var)
+                            stack.append(new_var)
+                
+                # Проверка вариантов
+                found = variants & dictionary
+                for variant in found:
+                    warnings.append(f"Модифицированное слово ({lang}): '{variant}'")
 
     checks = [
         (
