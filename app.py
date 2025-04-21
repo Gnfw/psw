@@ -37,8 +37,8 @@ DICTIONARY_URLS = {
 
 RUSSIAN_LETTERS = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя'
 BACKUP_WORDS = {
-    'english': ['apple', 'sun', 'moon', 'tree', 'flower'],
-    'russian': ['солнце', 'луна', 'дерево', 'цветок', 'кофе']
+    'english': ['cat', 'dog', 'sun', 'moon', 'tree', 'flower', 'wanigan'],
+    'russian': ['солнце', 'луна', 'дерево', 'цветок', 'кофе', 'кот', 'диго']
 }
 
 UNICODE_CHARS = "★☺♫♪♣♠♥♦✓✔✗✘∞≈≠≤≥±−×÷←↑→↓↔↕↨∂∅∆∈∏∑√∛∜∩∪∧∨¬≡≢⌈⌉⌊⌋◊"
@@ -52,7 +52,7 @@ def load_dictionary(lang: str) -> Set[str]:
         words = {
             word.strip().lower()
             for word in response.text.splitlines()
-            if 4 <= len(word.strip()) <= 8
+            if 3 <= len(word.strip()) <= 12
         }
         all_words.update(words)
     except Exception as e:
@@ -109,18 +109,6 @@ REPLACEMENTS = {
     'ё': '3'
 }
 
-def reverse_replacements(word: str) -> List[str]:
-    variants = [word]
-    for orig, repl in REPLACEMENTS.items():
-        new_vars = []
-        for var in variants:
-            if orig in var:
-                new_vars.append(var.replace(orig, repl))
-            if repl in var:
-                new_vars.append(var.replace(repl, orig))
-        variants += new_vars
-    return list(set(variants))
-
 def check_password_strength(password: str, options: PasswordOptions, langs: List[str]) -> Dict:
     warnings = []
     
@@ -133,23 +121,21 @@ def check_password_strength(password: str, options: PasswordOptions, langs: List
             'compromised': False
         }
 
-    if len(password) < 12:
-        warnings.append("Пароль слишком короткий (минимум 12 символов)")
+    if len(password) < 8:
+        warnings.append("Пароль слишком короткий (минимум 8 символов)")
     elif len(password) > 100:
         warnings.append("Пароль слишком длинный (максимум 100 символов)")
 
     if not (options & PasswordOptions.OPT_MNEMONIC):
-       clean_password = re.sub(r'[\W_]', ' ', password.lower())
+        clean_password = re.sub(r'[\W_]', ' ', password.lower())
         words = re.findall(r'\b[a-zа-яё]{3,}\b', clean_password)
         
         for lang in langs:
             dictionary = load_dictionary(lang)
             for word in words:
-                # Прямое совпадение
                 if word in dictionary:
                     warnings.append(f"Словарное слово ({lang}): '{word}'")
                 
-                # Глубокий поиск замен
                 variants = set()
                 stack = [word]
                 seen = set()
@@ -170,7 +156,6 @@ def check_password_strength(password: str, options: PasswordOptions, langs: List
                             variants.add(new_var)
                             stack.append(new_var)
                 
-                # Проверка вариантов
                 found = variants & dictionary
                 for variant in found:
                     warnings.append(f"Модифицированное слово ({lang}): '{variant}'")
