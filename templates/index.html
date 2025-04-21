@@ -5,70 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Password Manager</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
-        :root {
-            --bg-color: #ffffff;
-            --text-color: #1a1a1a;
-            --card-bg: #f8fafc;
-            --primary: #3b82f6;
-        }
-
         .dark-mode {
-            --bg-color: #1a1b1f;
-            --text-color: #e2e8f0;
-            --card-bg: #2d2f36;
-            --primary: #60a5fa;
+            background: #1a1b1f;
+            color: #e2e8f0;
         }
-
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            transition: background-color 0.3s, color 0.3s;
+        .dark-mode .card {
+            background: #2d2f36;
         }
-
+        .dark-mode input,
+        .dark-mode select,
+        .dark-mode .result-box {
+            background: #2d2f36;
+            color: #e2e8f0;
+            border-color: #4a4b52;
+        }
+        .dark-mode .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        .dark-mode .warning {
+            background: #7f1d1d;
+            color: #fecaca;
+        }
         .preloader {
             animation: spin 1s linear infinite;
-            border-top-color: var(--primary);
+            border-top-color: #3b82f6;
         }
-
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
-        .fade-in {
-            animation: fadeIn 0.5s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .tooltip:hover .tooltip-text {
-            opacity: 1;
-            visibility: visible;
-        }
-
         #easter-egg {
+            display: none;
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: var(--card-bg);
+            background: white;
             padding: 2rem;
             border-radius: 1rem;
             box-shadow: 0 0 20px rgba(0,0,0,0.2);
             z-index: 1000;
-            display: none;
+        }
+        .dark-mode #easter-egg {
+            background: #2d2f36;
+            color: white;
         }
     </style>
 </head>
-<body class="min-h-screen">
-    <div id="easter-egg" class="dark:bg-gray-800 dark:text-white">
+<body class="bg-gray-100">
+    <div id="easter-egg">
         <div class="text-2xl font-bold mb-4">🎉 Пасхалка!</div>
         <p>Если Вы это видите, то Вы находитесь в МИРЭА на "Инженерах будущего".</p>
         <p>2025 год, апрель, 24ое число</p>
@@ -79,136 +66,77 @@
     </div>
 
     <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <!-- Header -->
-        <header class="mb-12 text-center relative">
-            <div class="absolute top-0 right-0 flex gap-2">
-                <button onclick="toggleTheme()" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">
-                    🌓
-                </button>
-                <button onclick="exportHistory()" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">
-                    💾
-                </button>
-                <button onclick="clearHistory()" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">
-                    🗑
-                </button>
-            </div>
-            <h1 class="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+        <header class="mb-12 text-center">
+            <h1 class="text-4xl font-bold mb-2 text-blue-600">
                 Генератор безопасных паролей
             </h1>
+            <button onclick="toggleTheme()" class="px-4 py-2 bg-gray-200 rounded-lg">
+                🌓 Сменить тему
+            </button>
         </header>
 
-        <!-- Main Card -->
-        <div class="bg-gray-100 dark:bg-gray-800 rounded-xl shadow-2xl p-6 mb-8">
-            <!-- Generator Section -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8 card">
             <section class="mb-8">
-                <h2 class="text-xl font-semibold mb-4 flex items-center">
-                    🔐 Генерация пароля
-                </h2>
-
+                <h2 class="text-xl font-semibold mb-4">🔐 Генерация пароля</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Controls -->
                     <div class="space-y-4">
                         <div>
                             <label class="block text-sm mb-2">Длина пароля (8-100)</label>
                             <input type="number" id="length" value="16" min="8" max="100" 
-                                   class="w-full bg-white dark:bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                                   class="w-full bg-gray-50 rounded-lg px-4 py-2 border">
                         </div>
-
                         <div>
                             <label class="block text-sm mb-2">Язык словаря</label>
-                            <select id="lang-select" class="w-full bg-white dark:bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <select id="lang-select" class="w-full bg-gray-50 rounded-lg px-4 py-2 border">
                                 <option value="english">English</option>
                                 <option value="russian">Русский</option>
                                 <option value="both">Оба языка</option>
                             </select>
                         </div>
-
                         <div class="space-y-2">
                             <label class="block text-sm mb-2">Настройки:</label>
-                            <div class="grid grid-cols-1 gap-2" id="options-container">
-                                <!-- Options populated by JS -->
-                            </div>
+                            <div class="grid grid-cols-1 gap-2" id="options-container"></div>
                         </div>
-
                         <button onclick="generatePassword()" 
-                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-all relative">
+                                class="w-full bg-blue-600 text-white py-3 rounded-lg relative btn-primary">
                             <span id="generate-text">Сгенерировать пароль</span>
                             <div id="preloader" class="hidden absolute inset-0 flex items-center justify-center">
                                 <div class="preloader h-6 w-6 border-4 border-gray-300 rounded-full"></div>
                             </div>
                         </button>
                     </div>
-
-                    <!-- Result Display -->
-                    <div class="bg-white dark:bg-gray-900 rounded-lg p-4 fade-in">
+                    <div class="bg-gray-50 rounded-lg p-4 result-box">
                         <div class="flex items-center mb-4">
                             <input type="text" id="password-result" readonly 
-                                   class="flex-1 bg-transparent text-xl font-mono outline-none">
-                            <button onclick="copyPassword()" 
-                                    class="ml-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg tooltip">
+                                   class="flex-1 bg-transparent text-xl font-mono">
+                            <button onclick="copyPassword()" class="ml-2 p-2 hover:bg-gray-200 rounded-lg tooltip">
                                 📋
-                                <span class="tooltip-text absolute bottom-full left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-2 py-1 rounded text-sm">
-                                    Скопировать пароль
-                                </span>
+                                <span class="tooltip-text">Скопировать пароль</span>
                             </button>
                         </div>
-
                         <div class="space-y-2 text-sm">
-                            <div class="flex justify-between">
-                                <span>Стандартная энтропия:</span>
-                                <span id="entropy-standard">-</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span>Энтропия Шеннона:</span>
-                                <span id="entropy-shannon">-</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span>Комбинированная оценка:</span>
-                                <span id="entropy-combined">-</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span>Время взлома:</span>
-                                <span id="crack-time">-</span>
-                            </div>
-                            <div class="flex justify-between font-semibold">
-                                <span>Уровень безопасности:</span>
-                                <span id="security-level">-</span>
-                            </div>
+                            <div class="flex justify-between"><span>Стандартная энтропия:</span><span id="entropy-standard">-</span></div>
+                            <div class="flex justify-between"><span>Энтропия Шеннона:</span><span id="entropy-shannon">-</span></div>
+                            <div class="flex justify-between"><span>Комбинированная оценка:</span><span id="entropy-combined">-</span></div>
+                            <div class="flex justify-between"><span>Время взлома:</span><span id="crack-time">-</span></div>
+                            <div class="flex justify-between font-semibold"><span>Уровень безопасности:</span><span id="security-level">-</span></div>
                         </div>
-
-                        <div id="pwned-warning" class="mt-4 p-2 rounded-lg bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 hidden">
-                            ⚠️ Пароль найден в утечках данных!
-                        </div>
-
+                        <div id="pwned-warning" class="mt-4 p-2 rounded-lg warning hidden">⚠️ Пароль найден в утечках данных!</div>
                         <div id="warnings" class="mt-4 space-y-2"></div>
                     </div>
                 </div>
             </section>
 
-            <!-- Checker Section -->
             <section class="mb-8">
-                <h2 class="text-xl font-semibold mb-4 flex items-center">
-                    🔍 Проверка пароля
-                </h2>
+                <h2 class="text-xl font-semibold mb-4">🔍 Проверка пароля</h2>
                 <div class="flex flex-col md:flex-row gap-4">
                     <input type="text" id="password-check" placeholder="Введите пароль для проверки" 
-                           class="flex-1 bg-white dark:bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                    <button onclick="checkPassword()" 
-                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all">
+                           class="flex-1 bg-gray-50 rounded-lg px-4 py-2 border">
+                    <button onclick="checkPassword()" class="bg-blue-600 text-white px-6 py-2 rounded-lg btn-primary">
                         Проверить
                     </button>
                 </div>
                 <div id="check-results" class="mt-4 space-y-2"></div>
-            </section>
-
-            <!-- History Section -->
-            <section>
-                <h2 class="text-xl font-semibold mb-4 flex items-center">
-                    🕒 История генераций
-                </h2>
-                <div id="history" class="space-y-2 max-h-40 overflow-y-auto pr-2">
-                    <!-- History items will be added here -->
-                </div>
             </section>
         </div>
     </div>
@@ -226,107 +154,33 @@
             { id: 'OPT_MNEMONIC', label: 'Мнемоническая фраза' }
         ];
 
-        let encryptionKey = null;
-        let history = [];
-
-        // Инициализация
-        function init() {
-            initOptions();
-            loadTheme();
-            loadHistory();
-            document.getElementById('password-check').addEventListener('input', checkEasterEgg);
-        }
-
-        // Проверка пасхалки
-        function checkEasterEgg() {
-            const password = document.getElementById('password-check').value;
-            if (password === 'ИБ24042025') {
-                document.getElementById('easter-egg').style.display = 'block';
-            }
-        }
-
-        // Инициализация настроек
         function initOptions() {
             const container = document.getElementById('options-container');
             container.innerHTML = optionsConfig.map(opt => `
-                <label class="flex items-center space-x-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
-                    <input type="checkbox" class="form-checkbox text-blue-500" option="${opt.id}">
+                <label class="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded">
+                    <input type="checkbox" class="form-checkbox" option="${opt.id}">
                     <span>${opt.label}</span>
                 </label>
             `).join('');
         }
 
-        // Работа с темами
         function toggleTheme() {
             document.body.classList.toggle('dark-mode');
             localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
         }
 
         function loadTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.body.classList.toggle('dark-mode', savedTheme === 'dark');
-        }
-
-        // История генераций
-        async function loadHistory() {
-            const encrypted = localStorage.getItem('encryptedHistory');
-            if (!encrypted) return;
-            
-            try {
-                const bytes = CryptoJS.AES.decrypt(encrypted, encryptionKey);
-                history = JSON.parse(bytes.toString(CryptoJS.enc.Utf8)) || [];
-            } catch {
-                history = [];
-            }
-            renderHistory();
-        }
-
-        function renderHistory() {
-            const container = document.getElementById('history');
-            container.innerHTML = history.map(item => `
-                <div class="fade-in p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                     onclick="document.getElementById('password-check').value = '${item.password}'; checkPassword()">
-                    <div class="flex justify-between items-center">
-                        <code class="text-sm">${item.password}</code>
-                        <span class="text-xs px-2 py-1 rounded-full ${item.strength > 3 ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900'}">
-                            ${item.strength}/5
-                        </span>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function clearHistory() {
-            if (confirm('Очистить всю историю генераций?')) {
-                history = [];
-                localStorage.removeItem('encryptedHistory');
-                renderHistory();
+            if (localStorage.getItem('theme') === 'dark') {
+                document.body.classList.add('dark-mode');
             }
         }
 
-        // Экспорт истории
-        async function exportHistory() {
-            if (!encryptionKey) {
-                encryptionKey = prompt('Введите мастер-пароль для шифрования истории:');
-            }
-            
-            const encrypted = CryptoJS.AES.encrypt(
-                JSON.stringify(history),
-                encryptionKey
-            ).toString();
-            
-            const blob = new Blob([encrypted], { type: 'text/plain;charset=utf-8' });
-            saveAs(blob, 'passwords_export.enc');
-        }
-
-        // Генерация пароля
         async function generatePassword() {
             try {
                 const length = parseInt(document.getElementById('length').value);
                 const options = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
                             .map(el => el.getAttribute('option'));
                 
-                // Валидация
                 if (isNaN(length) || length < 8 || length > 100) {
                     throw new Error('Длина пароля должна быть от 8 до 100 символов');
                 }
@@ -345,54 +199,30 @@
                 const response = await fetch('/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        length: length,
-                        options: options,
-                        langs: langs
-                    })
+                    body: JSON.stringify({ length, options, langs })
                 });
 
                 const data = await response.json();
-                
                 if (data.error) throw new Error(data.error);
                 
-                showGenerationResult(data);
-                updateHistory(data);
+                showResult(data);
                 
             } catch (error) {
-                showError(error.message);
+                alert(error.message);
             } finally {
                 toggleLoading(false);
             }
         }
 
-        // Отображение результатов генерации
-        function showGenerationResult(data) {
-            document.getElementById('password-result').value = data.password;
-            
-            document.getElementById('entropy-standard').textContent = `${data.entropy.standard.toFixed(2)} бит`;
-            document.getElementById('entropy-shannon').textContent = `${data.entropy.shannon.toFixed(2)} бит`;
-            document.getElementById('entropy-combined').textContent = `${data.entropy.combined.toFixed(2)} бит`;
-            document.getElementById('crack-time').textContent = formatTime(data.time_to_crack);
-            document.getElementById('security-level').textContent = getSecurityLevel(data.strength);
-            
-            document.getElementById('pwned-warning').classList.toggle('hidden', !data.compromised);
-            
-            document.getElementById('warnings').innerHTML = data.warnings.map(w => `
-                <div class="fade-in p-2 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded-lg">
-                    ⚠️ ${w}
-                </div>
-            `).join('');
-        }
-
-        // Проверка пароля
         async function checkPassword() {
             try {
                 const password = document.getElementById('password-check').value;
+                if (password === 'ИБ24042025') {
+                    document.getElementById('easter-egg').style.display = 'block';
+                }
                 if (!password) throw new Error('Введите пароль для проверки');
                 
                 toggleLoading(true);
-                
                 const response = await fetch('/check', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -400,47 +230,47 @@
                 });
 
                 const data = await response.json();
-                
                 if (data.error) throw new Error(data.error);
                 
                 showCheckResult(data);
                 
             } catch (error) {
-                showError(error.message);
+                alert(error.message);
             } finally {
                 toggleLoading(false);
             }
         }
 
-        // Отображение результатов проверки
+        function showResult(data) {
+            document.getElementById('password-result').value = data.password;
+            document.getElementById('entropy-standard').textContent = `${data.entropy.standard.toFixed(2)} бит`;
+            document.getElementById('entropy-shannon').textContent = `${data.entropy.shannon.toFixed(2)} бит`;
+            document.getElementById('entropy-combined').textContent = `${data.entropy.combined.toFixed(2)} бит`;
+            document.getElementById('crack-time').textContent = formatTime(data.time_to_crack);
+            document.getElementById('security-level').textContent = getSecurityLevel(data.strength);
+            document.getElementById('pwned-warning').classList.toggle('hidden', !data.compromised);
+            
+            document.getElementById('warnings').innerHTML = data.warnings.map(w => `
+                <div class="p-2 rounded-lg warning">⚠️ ${w}</div>
+            `).join('');
+        }
+
         function showCheckResult(data) {
             const results = document.getElementById('check-results');
             results.innerHTML = `
-                <div class="fade-in p-4 rounded-lg ${data.compromised ? 'bg-red-100 dark:bg-red-900' : 'bg-green-100 dark:bg-green-900'}">
+                <div class="p-4 rounded-lg ${data.compromised ? 'warning' : 'bg-green-100'}">
                     <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <div class="text-sm">Стандартная энтропия:</div>
-                            <div class="font-mono">${data.entropy.standard.toFixed(2)} бит</div>
-                        </div>
-                        <div>
-                            <div class="text-sm">Энтропия Шеннона:</div>
-                            <div class="font-mono">${data.entropy.shannon.toFixed(2)} бит</div>
-                        </div>
-                        <div>
-                            <div class="text-sm">Комбинированная оценка:</div>
-                            <div class="font-mono">${data.entropy.combined.toFixed(2)} бит</div>
-                        </div>
-                        <div>
-                            <div class="text-sm">Время взлома:</div>
-                            <div class="font-mono">${formatTime(data.time_to_crack)}</div>
-                        </div>
+                        <div>Стандартная энтропия: <span class="font-mono">${data.entropy.standard.toFixed(2)} бит</span></div>
+                        <div>Энтропия Шеннона: <span class="font-mono">${data.entropy.shannon.toFixed(2)} бит</span></div>
+                        <div>Комбинированная оценка: <span class="font-mono">${data.entropy.combined.toFixed(2)} бит</span></div>
+                        <div>Время взлома: <span class="font-mono">${formatTime(data.time_to_crack)}</span></div>
                     </div>
                     <div class="text-center font-semibold mb-4">
                         Уровень безопасности: ${getSecurityLevel(data.strength)}
                     </div>
                     ${data.compromised ? 
-                        '<div class="text-red-600 text-center">⚠️ Пароль найден в утечках данных!</div>' : 
-                        '<div class="text-green-600 text-center">✅ Пароль безопасен</div>'}
+                        '<div class="text-red-600">⚠️ Пароль найден в утечках данных!</div>' : 
+                        '<div class="text-green-600">✅ Пароль безопасен</div>'}
                     ${data.warnings.length ? `
                         <div class="mt-4">
                             <div class="font-semibold mb-2">Проблемы с паролем:</div>
@@ -451,10 +281,9 @@
             `;
         }
 
-        // Вспомогательные функции
         function formatTime(seconds) {
             const units = [
-                { value: 31536000, label: 'веков', div: 3153600000 },
+                { value: 31536000, label: 'лет' },
                 { value: 86400, label: 'дней' },
                 { value: 3600, label: 'часов' },
                 { value: 60, label: 'минут' },
@@ -463,7 +292,7 @@
             
             for (const unit of units) {
                 if (seconds >= unit.value) {
-                    const value = unit.div ? (seconds / unit.div).toFixed(1) : Math.ceil(seconds / unit.value);
+                    const value = Math.ceil(seconds / unit.value);
                     return `${value} ${unit.label}`;
                 }
             }
@@ -471,35 +300,24 @@
         }
 
         function getSecurityLevel(strength) {
-            const levels = [
-                'Очень слабый',
-                'Слабый',
-                'Средний',
-                'Сильный',
-                'Очень сильный'
-            ];
-            return levels[strength - 1] || 'Неизвестно';
+            return ['Очень слабый', 'Слабый', 'Средний', 'Сильный', 'Очень сильный'][strength - 1] || 'Неизвестно';
         }
 
         function toggleLoading(state) {
             document.getElementById('preloader').classList.toggle('hidden', !state);
-            document.getElementById('generate-text').classList.toggle('opacity-0', state);
         }
 
         function copyPassword() {
             const password = document.getElementById('password-result').value;
             if (password) {
                 navigator.clipboard.writeText(password);
-                alert('Пароль скопирован в буфер обмена!');
+                alert('Пароль скопирован!');
             }
         }
 
-        function showError(message) {
-            alert(`Ошибка: ${message}`);
-        }
-
-        // Запуск приложения
-        init();
+        // Инициализация
+        initOptions();
+        loadTheme();
     </script>
 </body>
 </html>
