@@ -112,12 +112,13 @@ REPLACEMENTS = {
 def reverse_replacements(word: str) -> List[str]:
     variants = [word]
     for orig, repl in REPLACEMENTS.items():
-        if orig in word or repl in word:
-            new_vars = []
-            for var in variants:
+        new_vars = []
+        for var in variants:
+            if orig in var:
                 new_vars.append(var.replace(orig, repl))
+            if repl in var:
                 new_vars.append(var.replace(repl, orig))
-            variants += new_vars
+        variants += new_vars
     return list(set(variants))
 
 def check_password_strength(password: str, options: PasswordOptions, langs: List[str]) -> Dict:
@@ -250,12 +251,13 @@ def generate_password_with_options(
     charset = ''.join(set(charset))
     
     if options & PasswordOptions.OPT_SEPARATORS:
-        base_length = length - (length // 4)
+        num_separators = (length // 4) - 1
+        base_length = length - num_separators
         base_length = max(base_length, 4)
+        
         password = ''.join(secrets.choice(charset) for _ in range(base_length))
         parts = [password[i:i+4] for i in range(0, len(password), 4)]
-        password = ''.join([part + secrets.choice(SEPARATORS) for part in parts])[:-1]
-        password = password[:length]
+        password = SEPARATORS.join(parts)[:length]
     else:
         password = ''.join(secrets.choice(charset) for _ in range(length))
     
