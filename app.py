@@ -42,7 +42,7 @@ BACKUP_WORDS = {
 }
 
 UNICODE_CHARS = "★☺♫♪♣♠♥♦✓✔✗✘∞≈≠≤≥±−×÷←↑→↓↔↕↨∂∅∆∈∏∑√∛∜∩∪∧∨¬≡≢⌈⌉⌊⌋◊"
-SEPARATORS = "-_!@#$%&*"  # Добавлены разные разделители
+SEPARATORS = "-_!@#$%&*"
 
 @lru_cache(maxsize=2)
 def load_dictionary(lang: str) -> Set[str]:
@@ -112,7 +112,7 @@ REPLACEMENTS = {
 def reverse_replacements(word: str) -> List[str]:
     variants = [word]
     for orig, repl in REPLACEMENTS.items():
-        if orig in word or repl in word:  # Фикс для п.6
+        if orig in word or repl in word:
             new_vars = []
             for var in variants:
                 new_vars.append(var.replace(orig, repl))
@@ -123,7 +123,6 @@ def reverse_replacements(word: str) -> List[str]:
 def check_password_strength(password: str, options: PasswordOptions, langs: List[str]) -> Dict:
     warnings = []
     
-    # Пасхалка для п.12
     if password == "ИБ24042025":
         return {
             'strength': 5,
@@ -138,10 +137,9 @@ def check_password_strength(password: str, options: PasswordOptions, langs: List
     elif len(password) > 100:
         warnings.append("Пароль слишком длинный (максимум 100 символов)")
 
-    # Пропускаем проверку словаря для мнемонических фраз (п.2)
     if not (options & PasswordOptions.OPT_MNEMONIC):
-        clean_password = re.sub(r'[\W_]+', ' ', password.lower())
-        words = clean_password.split()
+        clean_password = re.sub(r'[^\w]', ' ', password.lower())
+        words = re.findall(r'\b\w+\b', clean_password)
         
         for lang in langs:
             dictionary = load_dictionary(lang)
@@ -187,8 +185,8 @@ def check_password_strength(password: str, options: PasswordOptions, langs: List
             score -= 1
 
     entropy = calculate_entropy(password)
-    time_to_crack = max((2 ** entropy['combined']) / 1e12, 0.001)  # Фикс для п.3-5
-    strength = min(max(math.ceil(entropy['combined'] / 20), 1), 5)
+    time_to_crack = max((2 ** entropy['combined']) / 1e12, 0.001)
+    strength = min(max(math.ceil(entropy['combined'] / 15), 1), 5)
 
     return {
         'strength': strength,
