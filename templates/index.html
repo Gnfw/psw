@@ -1,20 +1,11 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-5LNKSMCEST"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-5LNKSMCEST');
-</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Бесплатный генератор и проверка надежности паролей онлайн. Создайте сложный безопасный пароль за секунду с настройками длины и символов. Проверьте стойкость вашего пароля к взлому.">
-    <meta name="keywords" content="генератор паролей, проверить пароль, безопасный пароль, создать пароль, сложный пароль, надежный пароль, онлайн генератор паролей">
-    <title>Генератор и проверка надежных паролей онлайн | Secure Password</title>
+    <title>Генератор безопасных паролей | Создание и проверка надежных паролей</title>
+    <meta name="description" content="Генератор безопасных паролей с проверкой стойкости. Создайте надежный пароль с помощью нашего инструмента. Проверьте свой пароль на безопасность и узнайте время взлома.">
+    <meta name="keywords" content="генератор паролей, безопасные пароли, создать пароль, проверка пароля, надежный пароль, энтропия пароля, время взлома пароля">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
         .dark-mode {
@@ -62,11 +53,9 @@
     <div class="container mx-auto px-4 py-8 max-w-4xl">
         <header class="mb-12 text-center">
             <h1 class="text-4xl font-bold mb-2 text-blue-600">
-                Генератор и проверка надежных паролей
+                Генератор безопасных паролей
             </h1>
-            <p class="text-lg text-gray-600 mb-4 dark:text-gray-300">
-                Создайте криптостойкий пароль и проверьте его безопасность бесплатно
-            </p>
+            <p class="text-gray-600 mb-4">Создавайте и проверяйте надежные пароли с помощью современного инструмента безопасности</p>
             <button onclick="toggleTheme()" class="px-4 py-2 bg-gray-200 rounded-lg">
                 🌓 Сменить тему
             </button>
@@ -74,11 +63,12 @@
 
         <div class="bg-white rounded-xl shadow-lg p-6 mb-8 card">
             <section class="mb-8">
-                <h2 class="text-xl font-semibold mb-4">🔐 Генерация безопасного пароля</h2>
+                <h2 class="text-xl font-semibold mb-4">🔐 Сгенерировать надежный пароль онлайн</h2>
+                <p class="text-gray-600 mb-4">Используйте наш генератор для создания стойких к взлому паролей. Выберите параметры и нажмите «Сгенерировать».</p>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-sm mb-2">Длина пароля (8-100 символов)</label>
+                            <label class="block text-sm mb-2">Длина пароля (8-100)</label>
                             <input type="number" id="length" value="16" min="8" max="100" 
                                    class="w-full bg-gray-50 rounded-lg px-4 py-2 border">
                         </div>
@@ -91,12 +81,12 @@
                             </select>
                         </div>
                         <div class="space-y-2">
-                            <label class="block text-sm mb-2">Настройки генерации:</label>
+                            <label class="block text-sm mb-2">Настройки:</label>
                             <div class="grid grid-cols-1 gap-2" id="options-container"></div>
                         </div>
                         <button onclick="generatePassword()" 
                                 class="w-full bg-blue-600 text-white py-3 rounded-lg relative btn-primary">
-                            <span id="generate-text">Сгенерировать надежный пароль</span>
+                            <span id="generate-text">Сгенерировать пароль</span>
                             <div id="preloader" class="hidden absolute inset-0 flex items-center justify-center">
                                 <div class="preloader h-6 w-6 border-4 border-gray-300 rounded-full"></div>
                             </div>
@@ -125,35 +115,34 @@
             </section>
 
             <section class="mb-8">
-                <h2 class="text-xl font-semibold mb-4">🔍 Проверка стойкости пароля</h2>
-                <p class="text-sm text-gray-500 mb-4">Проверьте, насколько ваш пароль устойчив к взлому методом перебора</p>
+                <h2 class="text-xl font-semibold mb-4">🔍 Проверить безопасность пароля</h2>
+                <p class="text-gray-600 mb-4">Узнайте надежность вашего пароля и проверьте его наличие в известных утечках данных.</p>
                 <div class="flex flex-col md:flex-row gap-4">
-                    <input type="text" id="password-check" placeholder="Введите пароль для анализа безопасности" 
+                    <input type="text" id="password-check" placeholder="Введите пароль для проверки" 
                            class="flex-1 bg-gray-50 rounded-lg px-4 py-2 border">
                     <button onclick="checkPassword()" class="bg-blue-600 text-white px-6 py-2 rounded-lg btn-primary">
-                        Проверить надежность
+                        Проверить
                     </button>
                 </div>
                 <div id="check-results" class="mt-4 space-y-2"></div>
             </section>
 
-            <section class="mt-8">
-                <h2 class="text-xl font-semibold mb-4">📝 Как создать надежный пароль?</h2>
+            <section class="mb-8">
+                <h2 class="text-xl font-semibold mb-4">💡 Советы по созданию надежных паролей</h2>
                 <div class="prose dark:prose-invert">
                     <p>Наш генератор паролей создает криптографически стойкие комбинации с учетом современных стандартов безопасности:</p>
-                    <ul class="list-disc pl-5">
+                 <ul class="list-disc pl-5">
                         <li>Используйте длину не менее 12 символов (рекомендуем 16+)</li>
                         <li>Комбинируйте буквы разных регистров, цифры и спецсимволы</li>
                         <li>Избегайте простых последовательностей (qwerty, 12345)</li>
                         <li>Не используйте личную информацию (даты, имена)</li>
                         <li>Для важных аккаунтов создавайте уникальные пароли</li>
                     </ul>
-                    <p class="mt-2">Помните: даже самый сложный пароль нужно регулярно менять и никому не сообщать!</p>
-                </div>
+               <p class="mt-2">Помните: даже самый сложный пароль нужно регулярно менять и никому не сообщать!</p>
+ </div>
             </section>
         </div>
 
-        <!-- SEO-оптимизированный футер -->
         <footer class="text-center text-xs text-gray-500 mt-12 p-4 border-t border-gray-200 dark:border-gray-700">
             <div class="mb-4">
                 <h3 class="text-sm font-semibold mb-2">Генератор паролей онлайн</h3>
@@ -171,7 +160,7 @@
                 </p>
             </div>
             <p class="text-xs">
-                © 2023 Secure Password Generator | Генератор сложных паролов | Проверка надежности пароля онлайн
+                © 2025 Secure Password Generator | Генератор сложных паролов | Проверка надежности пароля онлайн
             </p>
         </footer>
     </div>
@@ -193,7 +182,7 @@
             const container = document.getElementById('options-container');
             container.innerHTML = optionsConfig.map(opt => `
                 <label class="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded">
-                    <input type="checkbox" class="form-checkbox" option="${opt.id}" ${['OPT_LOWERCASE', 'OPT_UPPERCASE', 'OPT_DIGITS'].includes(opt.id) ? 'checked' : ''}>
+                    <input type="checkbox" class="form-checkbox" option="${opt.id}">
                     <span>${opt.label}</span>
                 </label>
             `).join('');
@@ -231,24 +220,16 @@
                     'both': ['english', 'russian']
                 }[document.getElementById('lang-select').value];
 
-                // Эмуляция запроса для демонстрации
-                await new Promise(resolve => setTimeout(resolve, 500));
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ length, options, langs })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
                 
-                // Генерация демо-данных
-                const demoData = {
-                    password: generateDemoPassword(length, options, langs),
-                    entropy: {
-                        standard: Math.random() * 50 + 50,
-                        shannon: Math.random() * 40 + 60,
-                        combined: Math.random() * 45 + 55
-                    },
-                    time_to_crack: Math.pow(10, Math.random() * 10),
-                    strength: Math.floor(Math.random() * 5) + 1,
-                    compromised: Math.random() > 0.8,
-                    warnings: Math.random() > 0.7 ? ['Пароль слишком короткий для высокого уровня безопасности'] : []
-                };
-                
-                showResult(demoData);
+                showResult(data);
                 
             } catch (error) {
                 alert(error.message);
@@ -257,73 +238,22 @@
             }
         }
 
-        function generateDemoPassword(length, options, langs) {
-            const chars = {
-                lowercase: 'abcdefghijklmnopqrstuvwxyz',
-                uppercase: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-                digits: '0123456789',
-                special: '!@#$%^&*()_+-=[]{}|;:,.<>?',
-                separators: '-_., ',
-                unicode: '★☀☂♫☎☯☮♻⚓⚡♔♕♖♗♘♙♚♛♜♝♞♟'
-            };
-            
-            let pool = '';
-            if (options.includes('OPT_LOWERCASE')) pool += chars.lowercase;
-            if (options.includes('OPT_UPPERCASE')) pool += chars.uppercase;
-            if (options.includes('OPT_DIGITS')) pool += chars.digits;
-            if (options.includes('OPT_SPECIAL')) pool += chars.special;
-            if (options.includes('OPT_SEPARATORS')) pool += chars.separators;
-            if (options.includes('OPT_UNICODE')) pool += chars.unicode;
-            
-            if (options.includes('OPT_MNEMONIC')) {
-                const words = {
-                    english: ['apple', 'river', 'sun', 'mountain', 'book', 'computer', 'password', 'secure'],
-                    russian: ['яблоко', 'река', 'солнце', 'гора', 'книга', 'компьютер', 'пароль', 'безопасность']
-                };
-                
-                let wordList = [];
-                if (langs.includes('english')) wordList = wordList.concat(words.english);
-                if (langs.includes('russian')) wordList = wordList.concat(words.russian);
-                
-                let result = '';
-                while (result.length < length) {
-                    const word = wordList[Math.floor(Math.random() * wordList.length)];
-                    result += (result.length > 0 ? '-' : '') + word;
-                }
-                return result.slice(0, length);
-            }
-            
-            let result = '';
-            for (let i = 0; i < length; i++) {
-                result += pool[Math.floor(Math.random() * pool.length)];
-            }
-            return result;
-        }
-
         async function checkPassword() {
             try {
                 const password = document.getElementById('password-check').value;
                 if (!password) throw new Error('Введите пароль для проверки');
                 
                 toggleLoading(true);
+                const response = await fetch('/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
                 
-                // Эмуляция запроса для демонстрации
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // Генерация демо-данных
-                const demoData = {
-                    entropy: {
-                        standard: password.length * 4 + Math.random() * 10,
-                        shannon: password.length * 5 + Math.random() * 8,
-                        combined: password.length * 4.5 + Math.random() * 9
-                    },
-                    time_to_crack: Math.pow(10, password.length / 2 + Math.random() * 3),
-                    strength: Math.min(5, Math.floor(password.length / 3) + (/\d/.test(password) ? 1 : 0) + (/[A-Z]/.test(password) ? 1 : 0) + (/[^a-zA-Z0-9]/.test(password) ? 1 : 0)),
-                    compromised: password.length < 8 || Math.random() > 0.9,
-                    warnings: password.length < 12 ? ['Рекомендуем использовать пароль длиной не менее 12 символов'] : []
-                };
-                
-                showCheckResult(demoData);
+                showCheckResult(data);
                 
             } catch (error) {
                 alert(error.message);
@@ -366,7 +296,7 @@
                         '<div class="text-green-600">✅ Пароль безопасен</div>'}
                     ${data.warnings.length ? `
                         <div class="mt-4">
-                            <div class="font-semibold mb-2">Рекомендации по улучшению:</div>
+                            <div class="font-semibold mb-2">Проблемы с паролем:</div>
                             ${data.warnings.map(w => `<div class="text-sm">⚠️ ${w}</div>`).join('')}
                         </div>
                     ` : ''}
@@ -398,27 +328,19 @@
 
         function toggleLoading(state) {
             document.getElementById('preloader').classList.toggle('hidden', !state);
-            document.getElementById('generate-text').classList.toggle('invisible', state);
         }
 
         function copyPassword() {
             const password = document.getElementById('password-result').value;
             if (password) {
                 navigator.clipboard.writeText(password);
-                alert('Пароль скопирован в буфер обмена!');
+                alert('Пароль скопирован!');
             }
         }
 
         // Инициализация
-        document.addEventListener('DOMContentLoaded', function() {
-            initOptions();
-            loadTheme();
-            
-            // Автогенерация пароля при загрузке
-            if (window.location.search.includes('generate=true')) {
-                generatePassword();
-            }
-        });
+        initOptions();
+        loadTheme();
     </script>
 </body>
 </html>
